@@ -7,6 +7,6 @@ import java.io.Serializable;
 
 public class StroomInputPartition implements InputPartition, Serializable {
     public InputPartitionReader createPartitionReader() {
-        return null;
+        return new StroomInputPartitionReader();
     }
 }
