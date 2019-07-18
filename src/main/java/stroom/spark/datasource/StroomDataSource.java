@@ -10,7 +10,7 @@ import org.apache.spark.sql.types.*;
 public class StroomDataSource implements DataSourceV2, ReadSupport {
     public static final StructType Schema = new StructType(
             new StructField[]{
-                    new StructField("name", DataTypes.IntegerType, false, new MetadataBuilder().build()),
+                    new StructField("name", DataTypes.createArrayType(DataTypes.ByteType,false), false, new MetadataBuilder().build()),
                     new StructField("age", DataTypes.IntegerType, false, new MetadataBuilder().build())
             }
     );
