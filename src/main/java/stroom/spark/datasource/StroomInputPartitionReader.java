@@ -9,6 +9,7 @@ import org.apache.spark.sql.catalyst.expressions.SpecificInternalRow;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.apache.spark.sql.catalyst.util.GenericArrayData;
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader;
+import org.apache.spark.unsafe.types.UTF8String;
 import scala.collection.immutable.Seq;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
         public int getAge() {return age;}
         public byte[] getNameBytes() {return name.getBytes(StandardCharsets.UTF_8);}
         public int getNameHashcode() {return name.hashCode();}
+        public UTF8String getNameUnsafe() { return UTF8String.fromBytes(getNameBytes());}
     }
 
     private static Person[] data = new Person[]{
@@ -58,7 +60,7 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
         };
 
 
-        GenericInternalRow genericInternalRow = new GenericInternalRow(new Object[]{new GenericArrayData(data[index].getNameBytes()), data[index].getAge()});
+        GenericInternalRow genericInternalRow = new GenericInternalRow(new Object[]{data[index].getNameUnsafe(), data[index].getAge()});
 
 //        SpecificInternalRow row = new SpecificInternalRow(StroomDataSource.Schema);
 
