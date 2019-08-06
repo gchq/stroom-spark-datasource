@@ -1,17 +1,28 @@
 package stroom.spark.datasource;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SQLImplicits;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.sources.And;
+import org.apache.spark.sql.sources.EqualTo;
+import org.apache.spark.sql.sources.Filter;
+import org.apache.spark.sql.sources.IsNotNull;
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.unsafe.types.UTF8String;
 import stroom.query.api.v2.*;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import java.io.IOException;
@@ -19,89 +30,12 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 
 public class StroomInputPartitionReader implements InputPartitionReader<InternalRow> {
 
-    private String jsonString = "{\n" +
-            "  \"key\": {\n" +
-            "    \"uuid\": \"API_CALL_myRunId2\"\n" +
-            "  },\n" +
-            "  \"query\": {\n" +
-            "    \"dataSource\": {\n" +
-            "      \"type\": \"index\",\n" +
-            "      \"uuid\": \"0b97de83-2b38-4915-81f0-c13cc7bf8adc\",\n" +
-            "      \"name\": \"Git Stored Fields\"\n" +
-            "    },\n" +
-            "    \"expression\": {\n" +
-            "      \"type\": \"operator\",\n" +
-            "      \"op\": \"AND\",\n" +
-            "      \"children\": [\n" +
-            "        {\n" +
-            "          \"type\": \"term\",\n" +
-            "          \"field\": \"EventTime\",\n" +
-            "          \"condition\": \"BETWEEN\",\n" +
-            "          \"value\": \"2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z\"\n" +
-            "        },\n" +
-            "        {\n" +
-            "          \"type\": \"term\",\n" +
-            "          \"field\": \"User\",\n" +
-            "          \"condition\": \"EQUALS\",\n" +
-            "          \"value\": \"gcdev373\"\n" +
-            "        }\n" +
-            "      ],\n" +
-            "      \"enabled\": true\n" +
-            "    }\n" +
-            "  },\n" +
-            "  \"resultRequests\": [\n" +
-            "    {\n" +
-            "      \"componentId\": \"table1\",\n" +
-            "      \"mappings\": [\n" +
-            "        {\n" +
-            "          \"queryId\": \"query1\",\n" +
-            "          \"fields\": [\n" +
-//            "            {\n" +
-//            "              \"name\": \"JSON\",\n" +
-//            "              \"expression\": \"${JSON}\",\n" +
-//            "              \"format\": {\n" +
-//            "                \"type\": \"DATE_TIME\"\n" +
-//            "              }\n" +
-//            "            },\n" +
-            "            {\n" +
-            "              \"name\": \"StreamId\",\n" +
-            "              \"expression\": \"${StreamId}\"\n" +
-            "            },\n" +
-            "            {\n" +
-            "              \"name\": \"EventId\",\n" +
-            "              \"expression\": \"${EventId}\"\n" +
-            "            }\n" +
-            "          ],\n" +
-            "          \"extractValues\": true,\n" +
-            "          \"extractionPipeline\": {\n" +
-            "            \"type\": \"Pipeline\",\n" +
-            "            \"uuid\": \"1a471960-e095-4d59-80f8-4352e0cf4938\",\n" +
-            "            \"name\": \"wholeEventAsJSONSearchExtraction\"\n" +
-            "          },\n" +
-            "          \"maxResults\": [\n" +
-            "            1000000\n" +
-            "          ]\n" +
-            "        }\n" +
-            "      ],\n" +
-            "      \"requestedRange\": {\n" +
-            "        \"offset\": 0,\n" +
-            "        \"length\": 1000\n" +
-            "      },\n" +
-            "      \"resultStyle\": \"TABLE\",\n" +
-            "      \"fetch\": \"ALL\"\n" +
-            "    }\n" +
-            "  ],\n" +
-            "  \"dateTimeLocale\": \"Europe/London\",\n" +
-            "  \"incremental\": false\n" +
-            "}";
+
 
     private String host;
     private String url;
@@ -112,18 +46,18 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
     private List<Row> rows = null;
     private int index = -1;
 
-    public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String token) {
+    public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String token, Filter[] filters) {
         this.host = host;
         this.url = url;
         this.token = token;
         this.protocol = protocol;
 
-        searchResponse = performSearch(createSearchRequest());
+        searchResponse = performSearch(createSearchRequest(filters));
 
 
     }
 
-    private static final String INDEX_DOCREF_TYPE_ID = "index";
+    private static final String INDEX_DOCREF_TYPE_ID = "Index";
     private static final String SELECTED_INDEX_UUID = "0b97de83-2b38-4915-81f0-c13cc7bf8adc";
     private static final String SELECTED_INDEX_NAME = "Git Stored Fields";
 
@@ -142,17 +76,43 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
     private static final String COMMENT_TAG = "Comment";
     private static final String PATH_TAG = "Path";
 
-    private SearchRequest createSearchRequest() {
+    private ExpressionOperator createOperator (Filter[] filters){
 
-        ExpressionOperator expressionOperator = new ExpressionOperator.Builder().addTerms(
+        Vector<ExpressionTerm> terms = new Vector<>();
+        //And, EqualNullSafe, EqualTo, GreaterThan, GreaterThanOrEqual,
+        // In, IsNotNull, IsNull, LessThan, LessThanOrEqual, Not, Or, StringContains, StringEndsWith, StringStartsWith
+        for (int i = 0; i < filters.length; i++){
 
-                new ExpressionTerm.Builder().field(USER_TAG).condition(
-                        ExpressionTerm.Condition.EQUALS
-                ).value("gcdev373").build(),
-                new ExpressionTerm.Builder().field(EVENT_TIME_TAG).condition(
-                        ExpressionTerm.Condition.BETWEEN
-                ).value("2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z").build()
-        ).build();
+            if (filters[i] instanceof EqualTo){
+                EqualTo filter = (EqualTo) filters[i];
+                ExpressionTerm term = new ExpressionTerm.Builder().
+                        field(filter.attribute()).
+                        condition(ExpressionTerm.Condition.EQUALS).
+                        value(filter.value().toString()).
+                        build();
+                terms.add(term);
+            } else if (filters[i] instanceof IsNotNull){
+                //Ignore for now
+                //todo do something more appropriate.
+            }
+            else
+            {
+                System.out.println ("Can't yet cope with filter " + filters[i]);
+            }
+        }
+
+        terms.add(new ExpressionTerm.Builder().field(EVENT_TIME_TAG).condition(
+                ExpressionTerm.Condition.BETWEEN
+        ).value("2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z").build());
+
+        ExpressionOperator expressionOperator = new ExpressionOperator.Builder().addTerms(terms).build();
+
+        return expressionOperator;
+    }
+
+    private SearchRequest createSearchRequest(Filter[] filters) {
+
+        ExpressionOperator expressionOperator = createOperator(filters);
 
         TableSettings tableSettings = new TableSettings.Builder()
                 .queryId("myQuery")
@@ -203,25 +163,67 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
         String fullUrl = protocol + "://"+ host + "/" + url;
         System.out.println("Connecting to " + fullUrl);
-System.out.println (Entity.json(searchRequest));
+
+        final ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
+        mapper.configure(SerializationFeature.INDENT_OUTPUT, false);
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        // Enabling default typing adds type information where it would otherwise be ambiguous, i.e. for abstract classes
+//        mapper.enableDefaultTyping();
+     //   mapper.writeValue(outputStream, objectModel);
+
+        String json = null;
+
+        try {
+            json = mapper.writeValueAsString(searchRequest);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            throw new IllegalArgumentException("Unable to serialize the search request");
+        }
+
+        System.out.println (json);
             Response response = client.target(fullUrl)
 
                     .request()
                     .header("Authorization", "Bearer " + token)
-                  //  .post(Entity.json(jsonString));
-                    .post(Entity.json(searchRequest));
+                    .accept(MediaType.APPLICATION_JSON_TYPE)
+                    .post(Entity.json(json));
+             //       .post(Entity.json(searchRequest));
+             //   .post(Entity.json(json));
             if (response.getStatus() != 200) {
                 System.err.println("Output...");
                 System.err.println(response.readEntity(String.class));
-                throw new IllegalArgumentException("Got non 200 response from stroom search API: "
+                throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
                         + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
             }
 
-            searchResponse = response.readEntity(SearchResponse.class);
-            //assume one Result object in the response
+            String responseBody = response.readEntity(String.class);
+
+//            System.out.println ("Response follows...");
+//            System.out.println (responseBody);
+
+        try {
+            searchResponse = mapper.readValue(responseBody, SearchResponse.class);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new IllegalArgumentException("Unable to read response");
+
+        }
+        //assume one Result object in the response
+
             TableResult tableResult = null;
             if (searchResponse != null && searchResponse.getResults() != null &&
                     searchResponse.getResults().size() > 0) {
+                if (searchResponse.getResults().size() != 1){
+                    throw new IllegalArgumentException("Only single result expected.  Got " +
+                            searchResponse.getResults().size());
+                }
+                if (!(searchResponse.getResults().get(0) instanceof TableResult)) {
+                    throw new IllegalArgumentException("TableResult expected but given " +
+                            searchResponse.getResults().get(0));
+                }
+
                 rows = ((TableResult) searchResponse.getResults().get(0)).getRows();
             }
 
@@ -233,7 +235,7 @@ System.out.println (Entity.json(searchRequest));
 
     public boolean next() {
         index ++;
-        return (searchResponse.complete() && index == searchResponse.getResults().size() - 1);
+        return (rows != null && index <= rows.size() - 1);
     }
 
     public InternalRow get() {
@@ -241,13 +243,31 @@ System.out.println (Entity.json(searchRequest));
         Row currentRow = rows.get(index);
 
         GenericInternalRow genericInternalRow =
-                new GenericInternalRow(currentRow.getValues().toArray());
+                new GenericInternalRow(convertVals(currentRow.getValues()));
 
 
         return genericInternalRow;
     }
 
     public void close() throws IOException {
+        //todo ask stroom to bin off the search
 
+    }
+
+    private static Object[] convertVals (List <String> original){
+        if (original == null)
+            return new Object[0];
+        Object [] output = new Object [original.size()];
+        int i = 0;
+        for (String val : original){
+
+            if (val == null){
+                output[i] = UTF8String.blankString(0);
+            } else {
+                output[i] = UTF8String.fromBytes(val.getBytes(StandardCharsets.UTF_8));
+            }
+            i++;
+        }
+        return output;
     }
 }

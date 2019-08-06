@@ -38,13 +38,16 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         List<InputPartition<InternalRow>> partitions = new ArrayList();
 
         //Just one partition
-        partitions.add(new StroomInputPartition(schema, protocol, host, url, token));
+        partitions.add(new StroomInputPartition(schema, protocol, host, url, token, filters));
         return partitions;
     }
 
     @Override
     public Filter[] pushFilters(Filter[] filters) {
         this.filters = filters;
+
+        for (int i = 0; i < filters.length; i++)
+            System.out.println("Filter: " + filters[i]);
         return filters;
     }
 

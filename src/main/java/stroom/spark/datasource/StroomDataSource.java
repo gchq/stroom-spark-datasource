@@ -21,8 +21,8 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
 
     public static final StructType TestSchema = new StructType(
             new StructField[]{
-                    new StructField("user", DataTypes.StringType, true, new MetadataBuilder().build()),
-                    new StructField("operation", DataTypes.StringType, true, new MetadataBuilder().build())
+                    new StructField("User", DataTypes.StringType, true, new MetadataBuilder().build()),
+                    new StructField("Operation", DataTypes.StringType, true, new MetadataBuilder().build())
             }
     );
 
@@ -53,6 +53,7 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
             //throw new IllegalArgumentException("Please provide a schema with the fields that you require and their XPaths");
         }
 
+        System.out.println ("Got a schema " + schema);
 
         token = dataSourceOptions.get(AUTH_TOKEN_KEY).orElseThrow(() ->
                 new IllegalArgumentException("Auth token must be provided via DataSourceOptions using key='token'"));
