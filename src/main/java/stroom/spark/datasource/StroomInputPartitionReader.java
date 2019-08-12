@@ -45,7 +45,7 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
     private List<Row> rows = null;
     private int indexWithinPage;
     private long pageIndex = -1;
-    private int pageSize = 5;
+    private int pageSize = 1000;
     private final String queryRequestKey;
 
     public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String token, Filter[] filters) {
@@ -179,7 +179,7 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
                         SELECTED_EXTRACTION_UUID,
                         SELECTED_EXTRACTION_NAME)
-                .addMaxResults(10000)
+                .addMaxResults(1000000)
                 .extractValues(true)
                 .build();
     }
@@ -237,8 +237,8 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
 
 
-        SearchResponse response;
-        long sleepMs = 5000;
+        TableResult result;
+        long sleepMs = 10;
 
         do{
             try {
@@ -246,14 +246,24 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            response = performSearch(searchRequest);
-            sleepMs = 2 * sleepMs;
-        } while (!response.complete());
+
+            sleepMs = 5 * sleepMs;
+
+        } while (performSearch(searchRequest));
 
     }
 
+    /**
+     *
+     * @param searchRequest
+     * @return true if there are more results anticipated for this request
+     */
+    private boolean performSearch(final SearchRequest searchRequest) {
 
-    private SearchResponse performSearch(final SearchRequest searchRequest) {
+        boolean moreExpected = false;
+
+        long maxIndex = searchRequest.getResultRequests().get(0).getRequestedRange().getOffset() +
+                searchRequest.getResultRequests().get(0).getRequestedRange().getLength() - 1;
 
         Client client = ClientBuilder.newClient();
 
@@ -323,9 +333,11 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
                             searchResponse.getResults().get(0));
                 }
 
-                rows = ((TableResult) searchResponse.getResults().get(0)).getRows();
+                tableResult = ((TableResult) searchResponse.getResults().get(0));
+                rows = tableResult.getRows();
+                moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.complete();
             }
-        return searchResponse;
+        return moreExpected;
     }
 
     private void readNextPage(){
