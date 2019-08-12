@@ -10,10 +10,8 @@ import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SQLImplicits;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
-import org.apache.spark.sql.sources.And;
-import org.apache.spark.sql.sources.EqualTo;
+import org.apache.spark.sql.sources.*;
 import org.apache.spark.sql.sources.Filter;
-import org.apache.spark.sql.sources.IsNotNull;
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
@@ -41,10 +39,14 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
     private String url;
     private String token;
     private String protocol;
-    private SearchResponse searchResponse = null;
+    private TableSettings tableSettings;
+    private Query query;
 
     private List<Row> rows = null;
-    private int index = -1;
+    private int indexWithinPage;
+    private long pageIndex = -1;
+    private int pageSize = 5;
+    private final String queryRequestKey;
 
     public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String token, Filter[] filters) {
         this.host = host;
@@ -52,9 +54,16 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
         this.token = token;
         this.protocol = protocol;
 
-        searchResponse = performSearch(createSearchRequest(filters));
+        initTableSettings();
+        initQuery(filters);
 
+        queryRequestKey = UUID.randomUUID().toString();
 
+        //Force the first page to be read
+        indexWithinPage = pageSize;
+
+        //Get Stroom to start the query
+        performSearch(createInitialSearchRequest());
     }
 
     private static final String INDEX_DOCREF_TYPE_ID = "Index";
@@ -79,25 +88,70 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
     private ExpressionOperator createOperator (Filter[] filters){
 
         Vector<ExpressionTerm> terms = new Vector<>();
-        //And, EqualNullSafe, EqualTo, GreaterThan, GreaterThanOrEqual,
-        // In, IsNotNull, IsNull, LessThan, LessThanOrEqual, Not, Or, StringContains, StringEndsWith, StringStartsWith
+        //todo increase support for more kinds of condition
+        // Now supports: EqualTo, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual
+        // Doesn't yet support: And, EqualNullSafe, In, IsNotNull, IsNull, Not, Or, StringContains, StringEndsWith, StringStartsWith
+
         for (int i = 0; i < filters.length; i++){
 
+            ExpressionTerm term = null;
             if (filters[i] instanceof EqualTo){
                 EqualTo filter = (EqualTo) filters[i];
-                ExpressionTerm term = new ExpressionTerm.Builder().
+                term = new ExpressionTerm.Builder().
                         field(filter.attribute()).
                         condition(ExpressionTerm.Condition.EQUALS).
                         value(filter.value().toString()).
                         build();
-                terms.add(term);
+
             } else if (filters[i] instanceof IsNotNull){
-                //Ignore for now
-                //todo do something more appropriate.
+                //Need to use a later version of Query API for this.
+                //todo use later Query API version
+//                IsNotNull filter = (IsNotNull) filters[i];
+//                ExpressionTerm term = new ExpressionTerm.Builder().
+//                        field(filter.attribute()).
+//                        condition(ExpressionTerm.Condition.IS_NOT_NULL).
+//                        build();
+            } else if (filters[i] instanceof GreaterThan){
+
+                GreaterThan filter = (GreaterThan) filters[i];
+                term = new ExpressionTerm.Builder().
+                        field(filter.attribute()).
+                        condition(ExpressionTerm.Condition.GREATER_THAN).
+                        value(filter.value().toString()).
+                        build();
+            }else if (filters[i] instanceof GreaterThanOrEqual){
+
+                GreaterThanOrEqual filter = (GreaterThanOrEqual) filters[i];
+                term = new ExpressionTerm.Builder().
+                        field(filter.attribute()).
+                        condition(ExpressionTerm.Condition.GREATER_THAN_OR_EQUAL_TO).
+                        value(filter.value().toString()).
+                        build();
+            } else if (filters[i] instanceof LessThan){
+
+                LessThan filter = (LessThan) filters[i];
+                term = new ExpressionTerm.Builder().
+                        field(filter.attribute()).
+                        condition(ExpressionTerm.Condition.LESS_THAN).
+                        value(filter.value().toString()).
+                        build();
+            }else if (filters[i] instanceof LessThanOrEqual){
+
+                LessThanOrEqual filter = (LessThanOrEqual) filters[i];
+                term = new ExpressionTerm.Builder().
+                        field(filter.attribute()).
+                        condition(ExpressionTerm.Condition.LESS_THAN_OR_EQUAL_TO).
+                        value(filter.value().toString()).
+                        build();
             }
+
             else
             {
-                System.out.println ("Can't yet cope with filter " + filters[i]);
+                System.out.println ("Can't yet handle filter " + filters[i]);
+            }
+
+            if (term != null){
+                terms.add(term);
             }
         }
 
@@ -110,11 +164,8 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
         return expressionOperator;
     }
 
-    private SearchRequest createSearchRequest(Filter[] filters) {
-
-        ExpressionOperator expressionOperator = createOperator(filters);
-
-        TableSettings tableSettings = new TableSettings.Builder()
+    private void initTableSettings (){
+        tableSettings = new TableSettings.Builder()
                 .queryId("myQuery")
                 .addFields(Arrays.asList(
                         new Field.Builder()
@@ -128,30 +179,76 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
                         SELECTED_EXTRACTION_UUID,
                         SELECTED_EXTRACTION_NAME)
-                .addMaxResults(100)
+                .addMaxResults(10000)
                 .extractValues(true)
-                . build();
+                .build();
+    }
 
+    private void initQuery (Filter[] filters) {
+        ExpressionOperator expressionOperator = createOperator(filters);
+
+
+        query = new Query.Builder()
+                .dataSource(INDEX_DOCREF_TYPE_ID, SELECTED_INDEX_UUID, SELECTED_INDEX_NAME)
+                .expression(expressionOperator).build();
+    }
+
+    private SearchRequest createInitialSearchRequest() {
 
         ResultRequest resultRequest = new ResultRequest.Builder().componentId("mainResult")
                 .resultStyle(ResultRequest.ResultStyle.TABLE)
-                .requestedRange(new OffsetRange.Builder().offset(0l).length(10l).build())
-
+                .requestedRange(new OffsetRange.Builder().offset(0l).length(0l).build())
                 .addMappings(tableSettings).build();
-
-        Query query = new Query.Builder()
-            .dataSource(INDEX_DOCREF_TYPE_ID, SELECTED_INDEX_UUID, SELECTED_INDEX_NAME)
-            .expression(expressionOperator).build();
 
         SearchRequest searchRequest = new SearchRequest.Builder()
                 .query(query)
-                .key(UUID.randomUUID().toString())
-                .incremental(false)
+                .key(queryRequestKey)
+                .incremental(true)
                 .dateTimeLocale("en-gb")
                 .addResultRequests(resultRequest)
+
                 .build();
 
         return searchRequest;
+
+    }
+
+    private SearchRequest createSearchRequest() {
+
+        ResultRequest resultRequest = new ResultRequest.Builder().componentId("mainResult")
+                .resultStyle(ResultRequest.ResultStyle.TABLE)
+                .requestedRange(new OffsetRange.Builder().offset(pageIndex * pageSize).length((long) pageSize).build())
+                .addMappings(tableSettings).build();
+
+        SearchRequest searchRequest = new SearchRequest.Builder()
+                .query(query)
+                .key(queryRequestKey)
+                .incremental(true)
+                .dateTimeLocale("en-gb")
+                .addResultRequests(resultRequest)
+
+                .build();
+
+        return searchRequest;
+
+    }
+
+    private void readResults (final SearchRequest searchRequest) {
+
+
+
+        SearchResponse response;
+        long sleepMs = 5000;
+
+        do{
+            try {
+                Thread.sleep(sleepMs);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            response = performSearch(searchRequest);
+            sleepMs = 2 * sleepMs;
+        } while (!response.complete());
 
     }
 
@@ -200,8 +297,10 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
             String responseBody = response.readEntity(String.class);
 
-//            System.out.println ("Response follows...");
-//            System.out.println (responseBody);
+            System.out.println ("Response follows...");
+            System.out.println (responseBody);
+
+        SearchResponse searchResponse;
 
         try {
             searchResponse = mapper.readValue(responseBody, SearchResponse.class);
@@ -226,25 +325,35 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
                 rows = ((TableResult) searchResponse.getResults().get(0)).getRows();
             }
-
-
         return searchResponse;
     }
 
+    private void readNextPage(){
+        pageIndex++;
+        indexWithinPage = 0;
+
+        System.out.println ("PageIndex, PageSize, IndexWithinPage" + pageIndex + " " + pageSize + " " + indexWithinPage);
+
+
+        readResults(createSearchRequest());
+    }
 
 
     public boolean next() {
-        index ++;
-        return (rows != null && index <= rows.size() - 1);
+        indexWithinPage ++;
+
+        if (indexWithinPage >= pageSize)
+            readNextPage();
+
+        return (rows != null && indexWithinPage <= rows.size() - 1);
     }
 
     public InternalRow get() {
 
-        Row currentRow = rows.get(index);
+        Row currentRow = rows.get(indexWithinPage);
 
         GenericInternalRow genericInternalRow =
                 new GenericInternalRow(convertVals(currentRow.getValues()));
-
 
         return genericInternalRow;
     }
