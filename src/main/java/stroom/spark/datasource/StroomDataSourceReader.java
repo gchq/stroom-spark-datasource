@@ -48,7 +48,9 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
         for (int i = 0; i < filters.length; i++)
             System.out.println("Filter: " + filters[i]);
-        return filters;
+
+        //Presume that all the filters will be consumed
+        return new Filter[0];
     }
 
     @Override

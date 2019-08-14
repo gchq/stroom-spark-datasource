@@ -87,7 +87,22 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
     private ExpressionOperator createOperator (Filter[] filters){
 
+        ExpressionItem expression = createExpression(filters);
+        ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
+
+        addExpressionTerm(builder, expression);
+        builder.addTerm(new ExpressionTerm.Builder().field(EVENT_TIME_TAG).condition(
+                ExpressionTerm.Condition.BETWEEN
+        ).value("2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z").build());
+
+        return builder.build();
+    }
+
+    private ExpressionItem createExpression (Filter[] filters){
+
         Vector<ExpressionTerm> terms = new Vector<>();
+        Vector<ExpressionOperator> operators = new Vector<>();
+
         //todo increase support for more kinds of condition
         // Now supports: EqualTo, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual
         // Doesn't yet support: And, EqualNullSafe, In, IsNotNull, IsNull, Not, Or, StringContains, StringEndsWith, StringStartsWith
@@ -95,6 +110,7 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
         for (int i = 0; i < filters.length; i++){
 
             ExpressionTerm term = null;
+            ExpressionOperator operator = null;
             if (filters[i] instanceof EqualTo){
                 EqualTo filter = (EqualTo) filters[i];
                 term = new ExpressionTerm.Builder().
@@ -143,8 +159,25 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
                         condition(ExpressionTerm.Condition.LESS_THAN_OR_EQUAL_TO).
                         value(filter.value().toString()).
                         build();
-            }
+            }else if (filters[i] instanceof Or) {
+                Or filter = (Or) filters[i];
 
+                ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
+
+                addExpressionTerm (builder, createExpression(new Filter[]{filter.left()}));
+                addExpressionTerm (builder, createExpression(new Filter[]{filter.right()}));
+
+                operator = builder.build();
+            } else if (filters[i] instanceof And) {
+                And filter = (And) filters[i];
+
+                ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
+
+                addExpressionTerm (builder, createExpression(new Filter[]{filter.left()}));
+                addExpressionTerm (builder, createExpression(new Filter[]{filter.right()}));
+
+                operator = builder.build();
+            }
             else
             {
                 System.out.println ("Can't yet handle filter " + filters[i]);
@@ -153,15 +186,46 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
             if (term != null){
                 terms.add(term);
             }
+            if (operator != null){
+                operators.add(operator);
+            }
+
         }
 
-        terms.add(new ExpressionTerm.Builder().field(EVENT_TIME_TAG).condition(
-                ExpressionTerm.Condition.BETWEEN
-        ).value("2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z").build());
+        ExpressionItem result;
 
-        ExpressionOperator expressionOperator = new ExpressionOperator.Builder().addTerms(terms).build();
+        if (terms.size() == 0 && operators.size() == 0){
+            result = null;
+        }
+        else if (terms.size() == 1 && operators.size() == 0) {
+            result = terms.get(0);
+        } else if (operators.size() == 1 && terms.size() == 0) {
+            result = operators.get(0);
+        } else if (terms.size() > 1 && operators.size() == 0){
+            //todo check that this is correct, should it actually be OR - the documentation for Spark interface spec
+            // does not appear to define
+            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+                    addTerms(terms).build();
 
-        return expressionOperator;
+        } else if (operators.size() > 1 && terms.size() == 0) {
+            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+                    addOperators(operators).build();
+        } else {
+            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+                    addOperators(operators).
+                    addOperator(new ExpressionOperator.Builder(ExpressionOperator.Op.AND).addTerms(terms).build()).build();
+        }
+
+        return result;
+    }
+
+    private static void addExpressionTerm(ExpressionOperator.Builder builder, ExpressionItem expressionItem) {
+        if (expressionItem == null)
+            return;
+        else if (expressionItem instanceof ExpressionOperator)
+            builder.addOperator((ExpressionOperator)expressionItem);
+        else if (expressionItem instanceof ExpressionTerm)
+            builder.addTerm((ExpressionTerm)expressionItem);
     }
 
     private void initTableSettings (){
@@ -253,13 +317,15 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
     }
 
+
+    private boolean verboseDebug = false;
+    private boolean firstRequest = true;
     /**
      *
      * @param searchRequest
      * @return true if there are more results anticipated for this request
      */
     private boolean performSearch(final SearchRequest searchRequest) {
-
         boolean moreExpected = false;
 
         long maxIndex = searchRequest.getResultRequests().get(0).getRequestedRange().getOffset() +
@@ -269,7 +335,9 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
 
         String fullUrl = protocol + "://"+ host + "/" + url;
-        System.out.println("Connecting to " + fullUrl);
+
+        if (verboseDebug)
+            System.out.println("Connecting to " + fullUrl);
 
         final ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -288,9 +356,14 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
             e.printStackTrace();
             throw new IllegalArgumentException("Unable to serialize the search request");
         }
+        if (firstRequest){
+            System.out.println ("Request follows...");
+            System.out.println (json);
+            firstRequest = false;
+        }
 
-        System.out.println (json);
-            Response response = client.target(fullUrl)
+
+        Response response = client.target(fullUrl)
 
                     .request()
                     .header("Authorization", "Bearer " + token)
@@ -301,14 +374,24 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
             if (response.getStatus() != 200) {
                 System.err.println("Output...");
                 System.err.println(response.readEntity(String.class));
-                throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
-                        + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
+
+                try{
+                    String responseBody = response.readEntity(String.class);
+                    if (responseBody.length() > 0) {
+                        throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
+                                + response.getStatus() + " " + responseBody);
+                    }
+                }catch (Exception ex) {
+                    throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
+                            + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
+                }
             }
 
             String responseBody = response.readEntity(String.class);
-
+        if (verboseDebug) {
             System.out.println ("Response follows...");
             System.out.println (responseBody);
+        }
 
         SearchResponse searchResponse;
 
@@ -344,8 +427,8 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
         pageIndex++;
         indexWithinPage = 0;
 
-        System.out.println ("PageIndex, PageSize, IndexWithinPage" + pageIndex + " " + pageSize + " " + indexWithinPage);
-
+        if (verboseDebug)
+            System.out.println ("PageIndex, PageSize, IndexWithinPage" + pageIndex + " " + pageSize + " " + indexWithinPage);
 
         readResults(createSearchRequest());
     }
@@ -370,8 +453,50 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
         return genericInternalRow;
     }
 
+    private String destroyURL = //"stroom-index/v2/destroy";
+    "api/stroom-index/v2/search";
+
     public void close() throws IOException {
-        //todo ask stroom to bin off the search
+
+        //POST to URL
+        //Payload is JSON. Example
+//        {
+//            "uuid": "7740bcd0-a49e-4c22-8540-044f85770716"
+//        }
+        Client client = ClientBuilder.newClient();
+
+
+        String fullUrl = protocol + "://"+ host + "/" + destroyURL;
+
+        if (true)
+            System.out.println("Connecting to " + fullUrl);
+
+
+        String json = "{ \"uuid\": \"" + queryRequestKey + "\" }";
+
+        if (true){
+            System.out.println ("Destruction request follows...");
+            System.out.println (json);
+        }
+
+        Response response = client.target(fullUrl)
+                .request()
+                .header("Authorization", "Bearer " + token)
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .post(Entity.json(json));
+
+        if (response.getStatus() != 200) {
+            System.err.println("Output...");
+            System.err.println(response.readEntity(String.class));
+            throw new IllegalArgumentException("Got non 200 response from Stroom destroy API: "
+                    + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
+        }
+
+        String responseBody = response.readEntity(String.class);
+        if (responseBody.length() > 0) {
+            System.out.println ("Response follows...");
+            System.out.println (responseBody);
+        }
 
     }
 
