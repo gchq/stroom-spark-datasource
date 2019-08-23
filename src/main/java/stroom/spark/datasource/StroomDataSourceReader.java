@@ -6,6 +6,7 @@ import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
 import org.apache.spark.sql.sources.v2.reader.InputPartition;
 import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters;
 import org.apache.spark.sql.types.*;
+import stroom.query.api.v2.Row;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,10 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     private String token;
     private String protocol;
     private String destroyUrl;
+    private StroomQuery stroomQuery;
+    private StroomSearcher searcher;
+    private int numPartitions = 3;
+    private int pageSize = 10000;
 
     StroomDataSourceReader(StructType schema, String protocol, String host, String url, String destroyUrl, String token){
         this.schema = schema;
@@ -37,16 +42,25 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     }
 
     public List<InputPartition<InternalRow>> planInputPartitions() {
+        searcher = new StroomSearcher(schema,protocol,host,url,destroyUrl,token);
+
+        searcher.performSearch(stroomQuery.createInitialSearchRequest());
+
         List<InputPartition<InternalRow>> partitions = new ArrayList();
 
-        //Just one partition
-        partitions.add(new StroomInputPartition(schema, protocol, host, url, destroyUrl, token, filters));
+        for (int i = 0; i < numPartitions; i++){
+            partitions.add(new StroomInputPartition(schema, protocol, host, url, destroyUrl, token,
+                    stroomQuery.getQueryRequestKey(), pageSize, i, numPartitions));
+        }
+
+
         return partitions;
     }
 
     @Override
     public Filter[] pushFilters(Filter[] filters) {
         this.filters = filters;
+        stroomQuery = new StroomQuery(filters);
 
         for (int i = 0; i < filters.length; i++)
             System.out.println("Filter: " + filters[i]);
