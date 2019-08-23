@@ -28,10 +28,12 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
 
     public static final String AUTH_TOKEN_KEY = "token";
     public static final String HOST_KEY = "host";
-    public static final String URL_PATH_KEY = "api_url";
+    public static final String URL_PATH_KEY = "search_url";
+    public static final String DESTROY_URL_PATH_KEY = "destroy_url";
     public static final String PROTOCOL_KEY = "protocol";
 
     private String url = "indexService/v2/search";
+    private String destroyUrl = "indexService/v2/destroy";
     private String host = "localhost";
     private String protocol = "https";
     private String token = null;
@@ -60,12 +62,13 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
 
         host = dataSourceOptions.get(HOST_KEY).orElse(host);
         url = dataSourceOptions.get(URL_PATH_KEY).orElse(url);
+        destroyUrl = dataSourceOptions.get(DESTROY_URL_PATH_KEY).orElse(destroyUrl);
         protocol = dataSourceOptions.get(PROTOCOL_KEY).orElse(url);
 
         System.out.println ("Protocol: " + protocol);
         System.out.println ("Host: " + host);
         System.out.println ("URL: " + url);
 
-        return new StroomDataSourceReader(schema, protocol, host, url, token);
+        return new StroomDataSourceReader(schema, protocol, host, url, destroyUrl, token);
     }
 }

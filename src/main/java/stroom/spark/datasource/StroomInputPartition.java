@@ -14,17 +14,19 @@ public class StroomInputPartition implements InputPartition, Serializable {
     private String url;
     private String token;
     private String protocol;
+    private String destroyUrl;
 
-    public StroomInputPartition(StructType schema, String protocol, String host, String url, String token, Filter[] filters) {
+    public StroomInputPartition(StructType schema, String protocol, String host, String url, String destroyUrl, String token, Filter[] filters) {
         this.schema = schema;
         this.protocol = protocol;
         this.host = host;
         this.url = url;
+        this.destroyUrl = destroyUrl;
         this.token = token;
         this.filters = filters;
     }
 
     public InputPartitionReader createPartitionReader() {
-        return new StroomInputPartitionReader(schema, protocol, host, url, token, filters);
+        return new StroomInputPartitionReader(schema, protocol, host, url, destroyUrl, token, filters);
     }
 }
