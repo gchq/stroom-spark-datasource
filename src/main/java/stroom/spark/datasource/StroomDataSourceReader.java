@@ -21,13 +21,15 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     private String url;
     private String token;
     private String protocol;
+    private String destroyUrl;
 
-    StroomDataSourceReader(StructType schema, String protocol, String host, String url, String token){
+    StroomDataSourceReader(StructType schema, String protocol, String host, String url, String destroyUrl, String token){
         this.schema = schema;
         this.host = host;
         this.url = url;
         this.token = token;
         this.protocol = protocol;
+        this.destroyUrl = destroyUrl;
     }
 
     public StructType readSchema() {
@@ -38,7 +40,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         List<InputPartition<InternalRow>> partitions = new ArrayList();
 
         //Just one partition
-        partitions.add(new StroomInputPartition(schema, protocol, host, url, token, filters));
+        partitions.add(new StroomInputPartition(schema, protocol, host, url, destroyUrl, token, filters));
         return partitions;
     }
 

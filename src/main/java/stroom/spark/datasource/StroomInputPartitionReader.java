@@ -37,6 +37,7 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
 
     private String host;
     private String url;
+    private String destroyURL;
     private String token;
     private String protocol;
     private TableSettings tableSettings;
@@ -48,11 +49,12 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
     private int pageSize = 1000;
     private final String queryRequestKey;
 
-    public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String token, Filter[] filters) {
+    public StroomInputPartitionReader(StructType schema, String protocol, String host, String url, String destroyURL, String token, Filter[] filters) {
         this.host = host;
         this.url = url;
         this.token = token;
         this.protocol = protocol;
+        this.destroyURL = destroyURL;
 
         initTableSettings();
         initQuery(filters);
@@ -453,8 +455,7 @@ private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
         return genericInternalRow;
     }
 
-    private String destroyURL = //"stroom-index/v2/destroy";
-    "api/stroom-index/v2/search";
+
 
     public void close() throws IOException {
 
