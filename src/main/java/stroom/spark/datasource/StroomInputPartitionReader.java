@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
+
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.SQLImplicits;
 import org.apache.spark.sql.catalyst.InternalRow;

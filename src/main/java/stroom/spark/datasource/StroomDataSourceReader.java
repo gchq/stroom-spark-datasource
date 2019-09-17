@@ -6,7 +6,6 @@ import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
 import org.apache.spark.sql.sources.v2.reader.InputPartition;
 import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters;
 import org.apache.spark.sql.types.*;
-import stroom.query.api.v2.Row;
 
 import java.util.ArrayList;
 import java.util.List;
