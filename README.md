@@ -7,8 +7,34 @@ pyspark --jars target/stroom-datasource-1.0-SNAPSHOT.jar,lib/stroom-query-api-v2
 
 Then from within pyspark shell, try
 ```
-df = spark.read.format('stroom.spark.datasource.StroomDataSource').load(token='mybiglongauthenticationtokenstringgoesinhere',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy')
+from pyspark.sql.types import *
+mystruct = StructType([StructField("User", StringType(), True, metadata={"xpath": "EventSource/User/Id"}), StructField("Operation", StringType(), True, metadata={"xpath": "EventDetail/TypeId"})])
+
+df = spark.read.format('stroom.spark.datasource.StroomDataSource').load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0', schema=mystruct)
 
 df.filter((df['User'] == 'user1') | (df['User'] == 'user2') | (df['User'] == 'user3')).groupBy(df['Operation']).count().show()
 
 ```
+
+Without defining a schema, certain basic operations are possible using a built in (default schema)
+```
+basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0')
+
+basicDf.groupBy(basicDf['StreamId']).count().sort(['count'], ascending=False).show()
+```
+
+It is possible to work with the JSON directly in Spark, rather than with XPaths
+```
+from pyspark.sql.functions import from_json, col
+
+json_schema = spark.read.json(basicDf.rdd.map(lambda row: row.Event)).schema
+json_schema.show()
+
+structuredDf = basicDf.withColumn('evt', from_json(col('Event'), json_schema))
+
+wideDf=structuredDf.withColumn ('timestamp', col('evt.Event.EventTime.TimeCreated')).withColumn ('user', col('evt.Event.EventSource.User.Id'))
+
+wideDf.show()
+```
+
+

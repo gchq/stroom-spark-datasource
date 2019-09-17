@@ -8,19 +8,25 @@ import org.apache.spark.sql.types.StructType;
 import java.io.Serializable;
 
 public class StroomInputPartition implements InputPartition, Serializable {
-    private StructType schema;
-    private String host;
-    private String url;
-    private String token;
-    private String protocol;
-    private String destroyUrl;
-    private String queryRequestId;
-    private int pageSize;
-    private int partitionId;
-    private int numberOfPartitions;
+    private final StructType schema;
+    private final String host;
+    private final String url;
+    private final String token;
+    private final String protocol;
+    private final String destroyUrl;
+    private final String queryRequestId;
+    private final int pageSize;
+    private final int partitionId;
+    private final int numberOfPartitions;
+    private final String indexUUID;
+    private final String extractionPipelineUUID;
+    private final String eventTimeFieldName;
 
-
-    public StroomInputPartition(StructType schema, String protocol, String host, String url, String destroyUrl, String token, String queryRequestId, int pageSize, int partitionId, int numberOfPartitions) {
+    public StroomInputPartition(final StructType schema, final String protocol, final String host, final String url, final String destroyUrl,
+                                final String token, final String queryRequestId, final int pageSize,
+                                final int partitionId, final int numberOfPartitions,
+                                final String indexUUID, final String extractionPipelineUUID,
+                                final String eventTimeFieldName) {
         this.schema = schema;
         this.protocol = protocol;
         this.host = host;
@@ -31,11 +37,14 @@ public class StroomInputPartition implements InputPartition, Serializable {
         this.pageSize = pageSize;
         this.partitionId = partitionId;
         this.numberOfPartitions = numberOfPartitions;
+        this.indexUUID = indexUUID;
+        this.extractionPipelineUUID = extractionPipelineUUID;
+        this.eventTimeFieldName = eventTimeFieldName;
     }
 
     public InputPartitionReader createPartitionReader() {
         StroomSearcher searcher = new StroomSearcher(schema,protocol,host,url,destroyUrl,token);
-        StroomQuery query = new StroomQuery(queryRequestId);
+        StroomQuery query = new StroomQuery(indexUUID, extractionPipelineUUID, schema, queryRequestId, eventTimeFieldName);
         return new StroomInputPartitionReader(searcher, query, pageSize, partitionId, numberOfPartitions);
     }
 }

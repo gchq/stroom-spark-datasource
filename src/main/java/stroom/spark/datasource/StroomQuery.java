@@ -2,51 +2,73 @@ package stroom.spark.datasource;
 
 import org.apache.spark.sql.sources.*;
 import org.apache.spark.sql.sources.Filter;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import stroom.query.api.v2.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.Vector;
+
+import static stroom.spark.datasource.StroomDataSource.XPATH_METADATA_KEY;
+
 
 public class StroomQuery {
 
     private static final String INDEX_DOCREF_TYPE_ID = "Index";
-    private static final String SELECTED_INDEX_UUID = "0b97de83-2b38-4915-81f0-c13cc7bf8adc";
-    private static final String SELECTED_INDEX_NAME = "Git Stored Fields";
+    private static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";
+    private static final String EXTRACTION_PIPELINE_NAME = "Extraction Pipeline For Spark Datasource";
+    private static final String INDEX_NAME = "Index for Spark Datasource";
 
+//    private static final String SELECTED_INDEX_UUID = "0b97de83-2b38-4915-81f0-c13cc7bf8adc";
+//    private static final String SELECTED_INDEX_NAME = "Git Stored Fields";
 //    private static final String EXTRACTION_DOCREF_TYPEID = "Pipeline";
 //    private static final String SELECTED_EXTRACTION_UUID = "1a471960-e095-4d59-80f8-4352e0cf4938";
 //    private static final String SELECTED_EXTRACTION_NAME = "wholeEventAsJSONSearchExtraction";
+   // private static final String SELECTED_EXTRACTION_UUID = "85fb6396-ea09-4310-a051-fa850efe88ce";
+   // private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
+   // private static final String EVENT_TIME_TAG = "EventTime";
+   // private static final String USER_TAG = "User";
+   // private static final String OPERATION_TAG = "Operation";
+   // private static final String REPO_TAG = "Repo";
+   // private static final String COMMENT_TAG = "Comment";
+   // private static final String PATH_TAG = "Path";
 
-    private static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";
-    private static final String SELECTED_EXTRACTION_UUID = "85fb6396-ea09-4310-a051-fa850efe88ce";
-    private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
 
-    private static final String EVENT_TIME_TAG = "EventTime";
-    private static final String USER_TAG = "User";
-    private static final String OPERATION_TAG = "Operation";
-    private static final String REPO_TAG = "Repo";
-    private static final String COMMENT_TAG = "Comment";
-    private static final String PATH_TAG = "Path";
+
+    private final String indexUUID;
+    private final String extractionPipelineUUID;
+    private final String eventTimeFieldName;
 
     private TableSettings tableSettings;
     private Query query;
     private final String queryRequestKey;
+    private final StructType schema;
 
 
-    public StroomQuery (Filter[] filters){
+    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, Filter[] filters, final String eventTimeFieldName){
+        this.indexUUID = indexUUID;
+        this.extractionPipelineUUID = extractionPipelineUUID;
+        this.schema = schema;
+        queryRequestKey = UUID.randomUUID().toString();
+        this.eventTimeFieldName = eventTimeFieldName;
+
         initTableSettings();
         initQuery(filters);
 
-        queryRequestKey = UUID.randomUUID().toString();
     }
 
     /**
      * @param queryRequestKey
      */
-    public StroomQuery (String queryRequestKey){
-        initTableSettings();
+    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, final String queryRequestKey, final String eventTimeFieldName){
         this.queryRequestKey = queryRequestKey;
+        this.indexUUID = indexUUID;
+        this.extractionPipelineUUID = extractionPipelineUUID;
+        this.schema = schema;
+        this.eventTimeFieldName = eventTimeFieldName;
+
+        initTableSettings();
     }
 
 
@@ -56,17 +78,17 @@ public class StroomQuery {
         ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
 
         addExpressionTerm(builder, expression);
-        builder.addTerm(new ExpressionTerm.Builder().field(EVENT_TIME_TAG).condition(
-                ExpressionTerm.Condition.BETWEEN
-        ).value("2016-01-01T00:00:00.000Z,2019-03-01T00:00:00.000Z").build());
+        builder.addTerm(new ExpressionTerm.Builder().field(eventTimeFieldName).condition(
+                ExpressionTerm.Condition.GREATER_THAN
+        ).value("2000-01-01T00:00:00.000Z").build());
 
         return builder.build();
     }
 
     private ExpressionItem createExpression (Filter[] filters){
 
-        Vector<ExpressionTerm> terms = new Vector<>();
-        Vector<ExpressionOperator> operators = new Vector<>();
+        ArrayList<ExpressionTerm> terms = new ArrayList<>();
+        ArrayList<ExpressionOperator> operators = new ArrayList<>();
 
         //todo increase support for more kinds of condition
         // Now supports: EqualTo, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual
@@ -194,23 +216,23 @@ public class StroomQuery {
     }
 
     private void initTableSettings (){
-        tableSettings = new TableSettings.Builder()
+        TableSettings.Builder builder = new TableSettings.Builder()
                 .queryId("myQuery")
-                .addFields(Arrays.asList(
-                        new Field.Builder()
-                                .name(USER_TAG)
-                                .expression("${" + USER_TAG + "}")
-                                .build(),
-                        new Field.Builder()
-                                .name(OPERATION_TAG)
-                                .expression("${" + OPERATION_TAG + "}")
-                                .build()))
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
-                        SELECTED_EXTRACTION_UUID,
-                        SELECTED_EXTRACTION_NAME)
+                        extractionPipelineUUID,
+                        EXTRACTION_PIPELINE_NAME)
                 .addMaxResults(1000000)
-                .extractValues(true)
-                .build();
+                .extractValues(true);
+
+        for (StructField field : schema.fields()) {
+                builder.addFields(
+                    new Field.Builder()
+                            .name(field.name())
+                            .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
+                            .build());
+        }
+
+        tableSettings = builder.build();
     }
 
     private void initQuery (Filter[] filters) {
@@ -218,7 +240,7 @@ public class StroomQuery {
 
 
         query = new Query.Builder()
-                .dataSource(INDEX_DOCREF_TYPE_ID, SELECTED_INDEX_UUID, SELECTED_INDEX_NAME)
+                .dataSource(INDEX_DOCREF_TYPE_ID, indexUUID, INDEX_NAME)
                 .expression(expressionOperator).build();
     }
 
