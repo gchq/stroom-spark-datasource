@@ -5,10 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
-import org.apache.spark.sql.sources.*;
-import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
 import stroom.query.api.v2.*;
@@ -20,10 +16,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
-import java.util.Vector;
+
+import static stroom.spark.datasource.StroomDataSource.*;
 
 public class StroomSearcher {
 
@@ -64,7 +59,7 @@ public class StroomSearcher {
         return result.rows;
     }
 
-    private boolean verboseDebug = false;
+
     private boolean firstRequest = true;
 
     public static class StroomSearchResult{
@@ -88,7 +83,7 @@ public class StroomSearcher {
 
         String fullUrl = protocol + "://"+ host + "/" + url;
 
-        if (verboseDebug)
+        if (VERBOSE_DEBUG)
             System.out.println("Connecting to " + fullUrl);
 
         final ObjectMapper mapper = new ObjectMapper();
@@ -140,7 +135,7 @@ public class StroomSearcher {
         }
 
         String responseBody = response.readEntity(String.class);
-        if (verboseDebug) {
+        if (VERBOSE_DEBUG) {
             System.out.println ("Response follows...");
             System.out.println (responseBody);
         }

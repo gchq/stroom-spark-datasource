@@ -23,18 +23,20 @@ basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').load(tok
 basicDf.groupBy(basicDf['StreamId']).count().sort(['count'], ascending=False).show()
 ```
 
-It is possible to work with the JSON directly in Spark, rather than with XPaths
+When working with JSON, it is possible to work with the JSON directly in Spark, rather than by specifying XPaths.
 ```
 from pyspark.sql.functions import from_json, col
 
 json_schema = spark.read.json(basicDf.rdd.map(lambda row: row.Event)).schema
-json_schema.show()
+json_schema
 
 structuredDf = basicDf.withColumn('evt', from_json(col('Event'), json_schema))
 
-wideDf=structuredDf.withColumn ('timestamp', col('evt.Event.EventTime.TimeCreated')).withColumn ('user', col('evt.Event.EventSource.User.Id'))
+wideDf=structuredDf.withColumn ('timestamp', col('evt.Event.EventTime.TimeCreated')).withColumn ('user', col('evt.Event.EventSource.User.Id')).withColumn('operation', col('evt.Event.EventDetail.TypeId'))
 
 wideDf.show()
+
+wideDf.filter((wideDf['User'] == 'user1') | (wideDf['User'] == 'user2') | (wideDf['User'] == 'user3')).groupBy(wideDf['Operation']).count().show()
 ```
 
 

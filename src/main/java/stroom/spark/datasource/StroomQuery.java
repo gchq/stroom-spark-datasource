@@ -9,17 +9,10 @@ import stroom.query.api.v2.*;
 import java.util.*;
 
 import static stroom.query.api.v2.ExpressionTerm.*;
-import static stroom.spark.datasource.StroomDataSource.INDEXED_FIELD_METADATA_KEY;
-import static stroom.spark.datasource.StroomDataSource.XPATH_METADATA_KEY;
+import static stroom.spark.datasource.StroomDataSource.*;
 
 
 public class StroomQuery {
-
-    private static final String INDEX_DOCREF_TYPE_ID = "Index";
-    private static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";
-    private static final String EXTRACTION_PIPELINE_NAME = "Extraction Pipeline For Spark Datasource";
-    private static final String INDEX_NAME = "Index for Spark Datasource";
-
     private final String indexUUID;
     private final String extractionPipelineUUID;
     private final String eventTimeFieldName;
@@ -332,7 +325,8 @@ public class StroomQuery {
                 builder.addFields(
                         new Field.Builder()
                                 .name(field.name())
-                                .expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
+                                .expression("${" + "IgnoreThisField" + "}")
+                                //.expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
                                 .build());
             }
         }

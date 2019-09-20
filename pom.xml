@@ -20,12 +20,17 @@
         <dependency>
             <groupId>stroom</groupId>
             <artifactId>stroom-query-api</artifactId>
-            <version>v2.1-beta.21</version>
+            <version>SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>stroom</groupId>
             <artifactId>stroom-query-common</artifactId>
-            <version>v2.1-beta.21</version>
+            <version>SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>stroom</groupId>
+            <artifactId>stroom-docref</artifactId>
+            <version>SNAPSHOT</version>
         </dependency>
         <!-- <dependency>
             <groupId>stroom</groupId>
