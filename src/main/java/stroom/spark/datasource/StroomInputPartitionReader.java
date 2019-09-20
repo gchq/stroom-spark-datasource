@@ -82,18 +82,20 @@ public class StroomInputPartitionReader implements InputPartitionReader<Internal
         Row currentRow = rows.get(indexWithinPage);
 
         GenericInternalRow genericInternalRow =
-                new GenericInternalRow(convertVals(currentRow.getValues()));
+                new GenericInternalRow(convertVals(currentRow.getValues(), stroomQuery.getFieldIsIndexedVector()));
 
         return genericInternalRow;
     }
 
 
-    private static Object[] convertVals (List <String> original){
+    private static Object[] convertVals (List <String> original, boolean[] fieldIsIndexedVector ){
         if (original == null)
             return new Object[0];
         Object [] output = new Object [original.size()];
         int i = 0;
         for (String val : original){
+            if (fieldIsIndexedVector != null && i < fieldIsIndexedVector.length && fieldIsIndexedVector[i])
+                val = null;
 
             if (val == null){
                 output[i] = UTF8String.blankString(0);

@@ -6,10 +6,10 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import stroom.query.api.v2.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.UUID;
+import java.util.*;
 
+import static stroom.query.api.v2.ExpressionTerm.*;
+import static stroom.spark.datasource.StroomDataSource.INDEXED_FIELD_METADATA_KEY;
 import static stroom.spark.datasource.StroomDataSource.XPATH_METADATA_KEY;
 
 
@@ -19,22 +19,6 @@ public class StroomQuery {
     private static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";
     private static final String EXTRACTION_PIPELINE_NAME = "Extraction Pipeline For Spark Datasource";
     private static final String INDEX_NAME = "Index for Spark Datasource";
-
-//    private static final String SELECTED_INDEX_UUID = "0b97de83-2b38-4915-81f0-c13cc7bf8adc";
-//    private static final String SELECTED_INDEX_NAME = "Git Stored Fields";
-//    private static final String EXTRACTION_DOCREF_TYPEID = "Pipeline";
-//    private static final String SELECTED_EXTRACTION_UUID = "1a471960-e095-4d59-80f8-4352e0cf4938";
-//    private static final String SELECTED_EXTRACTION_NAME = "wholeEventAsJSONSearchExtraction";
-   // private static final String SELECTED_EXTRACTION_UUID = "85fb6396-ea09-4310-a051-fa850efe88ce";
-   // private static final String SELECTED_EXTRACTION_NAME = "Searching Git";
-   // private static final String EVENT_TIME_TAG = "EventTime";
-   // private static final String USER_TAG = "User";
-   // private static final String OPERATION_TAG = "Operation";
-   // private static final String REPO_TAG = "Repo";
-   // private static final String COMMENT_TAG = "Comment";
-   // private static final String PATH_TAG = "Path";
-
-
 
     private final String indexUUID;
     private final String extractionPipelineUUID;
@@ -46,7 +30,12 @@ public class StroomQuery {
     private final StructType schema;
 
 
-    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, Filter[] filters, final String eventTimeFieldName){
+
+    private ArrayList<Filter> pushedIndexedFilters = new ArrayList<Filter>();
+    private ArrayList<Filter> unpushedIndexedFilters = new ArrayList<Filter>();
+
+
+    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, Filter[] initialFilters, final String eventTimeFieldName){
         this.indexUUID = indexUUID;
         this.extractionPipelineUUID = extractionPipelineUUID;
         this.schema = schema;
@@ -54,7 +43,7 @@ public class StroomQuery {
         this.eventTimeFieldName = eventTimeFieldName;
 
         initTableSettings();
-        initQuery(filters);
+        initQuery(initialFilters);
 
     }
 
@@ -72,20 +61,39 @@ public class StroomQuery {
     }
 
 
-    private ExpressionOperator createOperator (Filter[] filters){
+    public Filter[] getUnpushedFilters (){return unpushedIndexedFilters.toArray(new Filter[unpushedIndexedFilters.size()]);}
 
-        ExpressionItem expression = createExpression(filters);
+    public Filter[] getPushedFilters (){return pushedIndexedFilters.toArray(new Filter[pushedIndexedFilters.size()]);}
+
+    private ExpressionOperator createOperator (Filter[] filters){
+        ArrayList<Filter> successfullyPushed = new ArrayList<>();
+        ArrayList<Filter> unsuccessfullyPushed = new ArrayList<>();
+
+        ExpressionItem expression = createExpression(filters, successfullyPushed, unsuccessfullyPushed);
+
+        pushedIndexedFilters = successfullyPushed;
+        unpushedIndexedFilters = unsuccessfullyPushed;
+
+
         ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
 
+
         addExpressionTerm(builder, expression);
-        builder.addTerm(new ExpressionTerm.Builder().field(eventTimeFieldName).condition(
-                ExpressionTerm.Condition.GREATER_THAN
-        ).value("2000-01-01T00:00:00.000Z").build());
+        builder.addTerm(new ExpressionTerm.Builder().
+                field(eventTimeFieldName).condition(Condition.GREATER_THAN).value("2000-01-01T00:00:00.000Z").build());
 
         return builder.build();
     }
 
-    private ExpressionItem createExpression (Filter[] filters){
+    private ExpressionItem createExpression (Filter[] filters, List<Filter> pushedFilters, List<Filter> unpushedFilters){
+
+        HashMap<String,String> indexedFieldMap = new HashMap<>();
+        //Only attempt to push the filters that relate to indexed fields
+        for (StructField field : schema.fields()) {
+            if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
+                indexedFieldMap.put(field.name(), field.metadata().getString(INDEXED_FIELD_METADATA_KEY));
+            }
+        }
 
         ArrayList<ExpressionTerm> terms = new ArrayList<>();
         ArrayList<ExpressionOperator> operators = new ArrayList<>();
@@ -100,74 +108,152 @@ public class StroomQuery {
             ExpressionOperator operator = null;
             if (filters[i] instanceof EqualTo){
                 EqualTo filter = (EqualTo) filters[i];
-                term = new ExpressionTerm.Builder().
-                        field(filter.attribute()).
-                        condition(ExpressionTerm.Condition.EQUALS).
-                        value(filter.value().toString()).
-                        build();
+
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.EQUALS).
+                            value(filter.value().toString()).
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
 
             } else if (filters[i] instanceof IsNotNull){
-                //Need to use a later version of Query API for this.
-                //todo use later Query API version
-//                IsNotNull filter = (IsNotNull) filters[i];
-//                ExpressionTerm term = new ExpressionTerm.Builder().
-//                        field(filter.attribute()).
-//                        condition(ExpressionTerm.Condition.IS_NOT_NULL).
-//                        build();
-            } else if (filters[i] instanceof GreaterThan){
+                IsNotNull filter = (IsNotNull) filters[i];
 
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.IS_NOT_NULL).
+
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
+
+            } else if (filters[i] instanceof GreaterThan){
                 GreaterThan filter = (GreaterThan) filters[i];
-                term = new ExpressionTerm.Builder().
-                        field(filter.attribute()).
-                        condition(ExpressionTerm.Condition.GREATER_THAN).
-                        value(filter.value().toString()).
-                        build();
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.GREATER_THAN).
+                            value(filter.value().toString()).
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
             }else if (filters[i] instanceof GreaterThanOrEqual){
 
                 GreaterThanOrEqual filter = (GreaterThanOrEqual) filters[i];
-                term = new ExpressionTerm.Builder().
-                        field(filter.attribute()).
-                        condition(ExpressionTerm.Condition.GREATER_THAN_OR_EQUAL_TO).
-                        value(filter.value().toString()).
-                        build();
+
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.GREATER_THAN_OR_EQUAL_TO).
+                            value(filter.value().toString()).
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
+
             } else if (filters[i] instanceof LessThan){
 
                 LessThan filter = (LessThan) filters[i];
-                term = new ExpressionTerm.Builder().
-                        field(filter.attribute()).
-                        condition(ExpressionTerm.Condition.LESS_THAN).
-                        value(filter.value().toString()).
-                        build();
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.LESS_THAN).
+                            value(filter.value().toString()).
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
+
             }else if (filters[i] instanceof LessThanOrEqual){
 
                 LessThanOrEqual filter = (LessThanOrEqual) filters[i];
-                term = new ExpressionTerm.Builder().
-                        field(filter.attribute()).
-                        condition(ExpressionTerm.Condition.LESS_THAN_OR_EQUAL_TO).
-                        value(filter.value().toString()).
-                        build();
+                if (indexedFieldMap.containsKey(filter.attribute())){
+                    term = new ExpressionTerm.Builder().
+                            field(indexedFieldMap.get(filter.attribute())).
+                            condition(Condition.LESS_THAN_OR_EQUAL_TO).
+                            value(filter.value().toString()).
+                            build();
+                    pushedFilters.add(filter);
+
+                } else {
+                    unpushedFilters.add(filter);
+                }
             }else if (filters[i] instanceof Or) {
                 Or filter = (Or) filters[i];
 
-                ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
 
-                addExpressionTerm (builder, createExpression(new Filter[]{filter.left()}));
-                addExpressionTerm (builder, createExpression(new Filter[]{filter.right()}));
+                //Before adding, confirm that both sides of filter can be pushed
+                ArrayList<Filter> successfullyPushed = new ArrayList<>();
+                ArrayList<Filter> unsuccessfullyPushed = new ArrayList<>();
 
-                operator = builder.build();
+                ExpressionItem leftItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
+                ExpressionItem rightItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
+
+                if (unsuccessfullyPushed.isEmpty()) {
+                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
+
+                    addExpressionTerm(builder, leftItem);
+                    addExpressionTerm(builder, rightItem);
+                    pushedFilters.add(filter);
+
+                    //Don't think this is required
+                    //pushedFilters.addAll(successfullyPushed);
+
+                    operator = builder.build();
+                }
+                else
+                {
+                    unpushedFilters.add(filter);
+                }
+
+
             } else if (filters[i] instanceof And) {
                 And filter = (And) filters[i];
 
-                ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
 
-                addExpressionTerm (builder, createExpression(new Filter[]{filter.left()}));
-                addExpressionTerm (builder, createExpression(new Filter[]{filter.right()}));
+                //Before adding, confirm that both sides of filter can be pushed
+                ArrayList<Filter> successfullyPushed = new ArrayList<>();
+                ArrayList<Filter> unsuccessfullyPushed = new ArrayList<>();
 
-                operator = builder.build();
+                ExpressionItem leftItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
+                ExpressionItem rightItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
+
+                if (unsuccessfullyPushed.isEmpty()) {
+                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
+
+                    addExpressionTerm(builder, leftItem);
+                    addExpressionTerm(builder, rightItem);
+                    pushedFilters.add(filter);
+
+                    //Don't think this is required
+                    //pushedFilters.addAll(successfullyPushed);
+
+                    operator = builder.build();
+                }
+                else
+                {
+                    unpushedFilters.add(filter);
+                }
             }
             else
             {
-                System.out.println ("Can't yet handle filter " + filters[i]);
+                throw new UnsupportedOperationException ("Can't yet handle filter " + filters[i]);
             }
 
             if (term != null){
@@ -215,6 +301,11 @@ public class StroomQuery {
             builder.addTerm((ExpressionTerm)expressionItem);
     }
 
+    private boolean [] fieldIsIndexedVector = null;
+    public boolean [] getFieldIsIndexedVector (){
+        return fieldIsIndexedVector;
+    }
+
     private void initTableSettings (){
         TableSettings.Builder builder = new TableSettings.Builder()
                 .queryId("myQuery")
@@ -224,19 +315,35 @@ public class StroomQuery {
                 .addMaxResults(1000000)
                 .extractValues(true);
 
-        for (StructField field : schema.fields()) {
+        boolean [] fieldsAreIndex = new boolean[schema.fields().length];
+
+        for (int i = 0; i < schema.fields().length; i++) {
+            fieldsAreIndex[i] = false;
+            StructField field = schema.fields()[i];
+
+            if (field.metadata().contains(XPATH_METADATA_KEY)) {
                 builder.addFields(
-                    new Field.Builder()
-                            .name(field.name())
-                            .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
-                            .build());
+                        new Field.Builder()
+                                .name(field.name())
+                                .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
+                                .build());
+            } else if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
+                fieldsAreIndex[i] = true;
+                builder.addFields(
+                        new Field.Builder()
+                                .name(field.name())
+                                .expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
+                                .build());
+            }
         }
+
+        fieldIsIndexedVector = fieldsAreIndex;
 
         tableSettings = builder.build();
     }
 
-    private void initQuery (Filter[] filters) {
-        ExpressionOperator expressionOperator = createOperator(filters);
+    private void initQuery (Filter[] initialFilters) {
+        ExpressionOperator expressionOperator = createOperator(initialFilters);
 
 
         query = new Query.Builder()

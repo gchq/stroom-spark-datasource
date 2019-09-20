@@ -14,24 +14,10 @@ import static org.apache.spark.sql.sources.v2.DataSourceOptions.PATH_KEY;
 
 public class StroomDataSource implements DataSourceV2, ReadSupport {
     public static final String XPATH_METADATA_KEY = "xpath";
+    public static final String INDEXED_FIELD_METADATA_KEY = "indexField";
 
     public static final StructType GenericSchema = new StructType(
-            new StructField[]{
-                    new StructField("xml", DataTypes.StringType, false, new MetadataBuilder().build())
-            }
-    );
 
-    public static final StructType TestSchema = new StructType(
-            new StructField[]{
-                    new StructField("StreamId", DataTypes.StringType, true,
-                            new MetadataBuilder().putString(XPATH_METADATA_KEY,"@StreamId").build()),
-                    new StructField("EventId", DataTypes.StringType, true,
-                            new MetadataBuilder().putString(XPATH_METADATA_KEY,"@EventId").build()),
-                    new StructField("EventTime", DataTypes.StringType, true,
-                            new MetadataBuilder().putString(XPATH_METADATA_KEY,"EventTime/TimeCreated").build()),
-                    new StructField("Event", DataTypes.StringType, true,
-                            new MetadataBuilder().putString(XPATH_METADATA_KEY,".").build())
-            }
     );
 
     public static final String AUTH_TOKEN_KEY = "token";
@@ -65,9 +51,10 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
      */
     public DataSourceReader createReader(StructType schema, DataSourceOptions dataSourceOptions){
         if (schema == null){
-            schema = TestSchema;
+            schema = GenericSchema;
             //throw new IllegalArgumentException("Please provide a schema with the fields that you require and their XPaths");
         }
+        //Test that the schema has xpath string for each field, or they are part of the index itself
 
         System.out.println ("Got a schema " + schema);
 
