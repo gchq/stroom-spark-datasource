@@ -2,6 +2,7 @@ package stroom.spark.datasource;
 
 import org.apache.spark.sql.sources.*;
 import org.apache.spark.sql.sources.Filter;
+import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import stroom.query.api.v2.*;
@@ -13,6 +14,8 @@ import static stroom.spark.datasource.StroomDataSource.*;
 
 
 public class StroomQuery {
+    private static final String DUMMY_FIELD_NAME = "_";
+
     private final String indexUUID;
     private final String extractionPipelineUUID;
     private final String eventTimeFieldName;
@@ -35,7 +38,7 @@ public class StroomQuery {
         queryRequestKey = UUID.randomUUID().toString();
         this.eventTimeFieldName = eventTimeFieldName;
 
-        initTableSettings();
+        initTableSettings(false);
         initQuery(initialFilters);
 
     }
@@ -50,7 +53,7 @@ public class StroomQuery {
         this.schema = schema;
         this.eventTimeFieldName = eventTimeFieldName;
 
-        initTableSettings();
+        initTableSettings(true);
     }
 
 
@@ -80,11 +83,11 @@ public class StroomQuery {
 
     private ExpressionItem createExpression (Filter[] filters, List<Filter> pushedFilters, List<Filter> unpushedFilters){
 
-        HashMap<String,String> indexedFieldMap = new HashMap<>();
+        HashMap<String, Metadata> indexedFieldMap = new HashMap<>();
         //Only attempt to push the filters that relate to indexed fields
         for (StructField field : schema.fields()) {
             if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
-                indexedFieldMap.put(field.name(), field.metadata().getString(INDEXED_FIELD_METADATA_KEY));
+                indexedFieldMap.put(field.name(), field.metadata());
             }
         }
 
@@ -102,9 +105,10 @@ public class StroomQuery {
             if (filters[i] instanceof EqualTo){
                 EqualTo filter = (EqualTo) filters[i];
 
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                    indexedFieldMap.get(filter.attribute()).getString(Condition.EQUALS.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.EQUALS).
                             value(filter.value().toString()).
                             build();
@@ -117,9 +121,10 @@ public class StroomQuery {
             } else if (filters[i] instanceof IsNotNull){
                 IsNotNull filter = (IsNotNull) filters[i];
 
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                        indexedFieldMap.get(filter.attribute()).getString(Condition.IS_NOT_NULL.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.IS_NOT_NULL).
 
                             build();
@@ -131,9 +136,10 @@ public class StroomQuery {
 
             } else if (filters[i] instanceof GreaterThan){
                 GreaterThan filter = (GreaterThan) filters[i];
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                        indexedFieldMap.get(filter.attribute()).getString(Condition.GREATER_THAN.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.GREATER_THAN).
                             value(filter.value().toString()).
                             build();
@@ -146,9 +152,10 @@ public class StroomQuery {
 
                 GreaterThanOrEqual filter = (GreaterThanOrEqual) filters[i];
 
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                        indexedFieldMap.get(filter.attribute()).getString(Condition.GREATER_THAN_OR_EQUAL_TO.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.GREATER_THAN_OR_EQUAL_TO).
                             value(filter.value().toString()).
                             build();
@@ -161,9 +168,10 @@ public class StroomQuery {
             } else if (filters[i] instanceof LessThan){
 
                 LessThan filter = (LessThan) filters[i];
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                        indexedFieldMap.get(filter.attribute()).getString(Condition.LESS_THAN.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.LESS_THAN).
                             value(filter.value().toString()).
                             build();
@@ -176,9 +184,10 @@ public class StroomQuery {
             }else if (filters[i] instanceof LessThanOrEqual){
 
                 LessThanOrEqual filter = (LessThanOrEqual) filters[i];
-                if (indexedFieldMap.containsKey(filter.attribute())){
+                if (indexedFieldMap.containsKey(filter.attribute()) &&
+                        indexedFieldMap.get(filter.attribute()).getString(Condition.LESS_THAN_OR_EQUAL_TO.name()) != null){
                     term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute())).
+                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
                             condition(Condition.LESS_THAN_OR_EQUAL_TO).
                             value(filter.value().toString()).
                             build();
@@ -187,9 +196,34 @@ public class StroomQuery {
                 } else {
                     unpushedFilters.add(filter);
                 }
-            }else if (filters[i] instanceof Or) {
-                Or filter = (Or) filters[i];
+            } else if (filters[i] instanceof Not){
+                Not filter = (Not) filters[i];
 
+                //Before adding, confirm that the negated filter can itself be pushed
+                ArrayList<Filter> successfullyPushed = new ArrayList<>();
+                ArrayList<Filter> unsuccessfullyPushed = new ArrayList<>();
+
+                ExpressionItem childItem = createExpression(new Filter[]{filter.child()}, successfullyPushed, unsuccessfullyPushed);
+
+                if (unsuccessfullyPushed.isEmpty()) {
+                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.NOT);
+
+                    addExpressionTerm(builder, childItem);
+                    pushedFilters.add(filter);
+
+                    //Don't think this is required
+                    //pushedFilters.addAll(successfullyPushed);
+
+                    operator = builder.build();
+                }
+                else
+                {
+                    System.out.println ("Not pushing NOT " + filter);
+                    unpushedFilters.add(filter);
+                }
+
+            } else if (filters[i] instanceof Or) {
+                Or filter = (Or) filters[i];
 
                 //Before adding, confirm that both sides of filter can be pushed
                 ArrayList<Filter> successfullyPushed = new ArrayList<>();
@@ -299,7 +333,9 @@ public class StroomQuery {
         return fieldIsIndexedVector;
     }
 
-    private void initTableSettings (){
+    private void initTableSettings (boolean dummy){
+
+
         TableSettings.Builder builder = new TableSettings.Builder()
                 .queryId("myQuery")
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
@@ -308,30 +344,41 @@ public class StroomQuery {
                 .addMaxResults(1000000)
                 .extractValues(true);
 
-        boolean [] fieldsAreIndex = new boolean[schema.fields().length];
-
-        for (int i = 0; i < schema.fields().length; i++) {
-            fieldsAreIndex[i] = false;
-            StructField field = schema.fields()[i];
-
-            if (field.metadata().contains(XPATH_METADATA_KEY)) {
+        if (dummy){
+            for (int i = 0; i < schema.fields().length; i++) {
                 builder.addFields(
                         new Field.Builder()
-                                .name(field.name())
-                                .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
-                                .build());
-            } else if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
-                fieldsAreIndex[i] = true;
-                builder.addFields(
-                        new Field.Builder()
-                                .name(field.name())
-                                .expression("${" + "IgnoreThisField" + "}")
-                                //.expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
+                                .name("F" + i)
+                                .expression("${" + DUMMY_FIELD_NAME + "}")
                                 .build());
             }
-        }
+        } else {
 
-        fieldIsIndexedVector = fieldsAreIndex;
+            boolean[] fieldsAreIndex = new boolean[schema.fields().length];
+
+            for (int i = 0; i < schema.fields().length; i++) {
+                fieldsAreIndex[i] = false;
+                StructField field = schema.fields()[i];
+
+                if (field.metadata().contains(XPATH_METADATA_KEY)) {
+                    builder.addFields(
+                            new Field.Builder()
+                                    .name (DUMMY_FIELD_NAME)  //(field.name())
+                                    .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
+                                    .build());
+                } else if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
+                    fieldsAreIndex[i] = true;
+                    builder.addFields(
+                            new Field.Builder()
+                                    .name(DUMMY_FIELD_NAME)  //(field.name())
+                                    .expression("${" + DUMMY_FIELD_NAME + "}")
+                                    //.expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
+                                    .build());
+                }
+            }
+
+            fieldIsIndexedVector = fieldsAreIndex;
+        }
 
         tableSettings = builder.build();
     }

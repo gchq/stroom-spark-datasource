@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 import static org.apache.spark.sql.sources.v2.DataSourceOptions.PATH_KEY;
 
 public class StroomDataSource implements DataSourceV2, ReadSupport {
-    public static boolean VERBOSE_DEBUG = true;
+    public static boolean VERBOSE_DEBUG = false;
 
     public static final String INDEX_DOCREF_TYPE_ID = "Index";
     public static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";

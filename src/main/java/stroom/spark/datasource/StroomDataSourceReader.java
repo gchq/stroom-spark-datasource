@@ -96,6 +96,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
                             field.getName());
 
                     for (ExpressionTerm.Condition condition : field.getConditions()) {
+                        System.out.println ("Field " + field.getName() + " supports " + condition.name());
                         fieldMetadataBuilder.putString(condition.name(), "supported");
                     }
 
