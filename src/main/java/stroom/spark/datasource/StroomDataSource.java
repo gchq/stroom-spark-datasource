@@ -7,20 +7,14 @@ import org.apache.spark.sql.sources.v2.ReadSupport;
 import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
 import org.apache.spark.sql.types.*;
 
-import java.net.URL;
-import java.util.function.Supplier;
-
-import static org.apache.spark.sql.sources.v2.DataSourceOptions.PATH_KEY;
 
 public class StroomDataSource implements DataSourceV2, ReadSupport {
-    public static boolean VERBOSE_DEBUG = false;
-
     public static final String INDEX_DOCREF_TYPE_ID = "Index";
     public static final String EXTRACTION_PIPELINE_DOCREF_TYPEID = "Pipeline";
     public static final String EXTRACTION_PIPELINE_NAME = "Extraction Pipeline For Spark Datasource";
     public static final String INDEX_NAME = "Index for Spark Datasource";
 
-    public static final String XPATH_METADATA_KEY = "xpath";
+    public static final String FIELD_CONTENT_METADATA_KEY = "get";
     public static final String INDEXED_FIELD_METADATA_KEY = "indexField";
     public static final String AUTH_TOKEN_KEY = "token";
     public static final String HOST_KEY = "host";
@@ -32,6 +26,7 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
     public static final String EXTRACTION_PIPELINE_UUID_KEY = "pipeline";
     public static final String INDEX_UUID_KEY = "index";
     public static final String EVENT_TIME_FIELD_NAME_KEY = "timestampField";
+    public static final String JSON_FIELD_NAME_KEY = "jsonField";
 
     private String url = "indexService/v2";
     private String searchPath = "search";
@@ -43,6 +38,7 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
     private String extractionPipelineUUID = null;
     private String indexUUID = null;
     private String eventTimeFieldName = "EventTime";
+    private String jsonFieldName = "Json";
 
     public DataSourceReader createReader(DataSourceOptions dataSourceOptions)
     {
@@ -74,14 +70,12 @@ public class StroomDataSource implements DataSourceV2, ReadSupport {
         datasourcePath = dataSourceOptions.get(DATASOURCE_PATH_KEY).orElse(datasourcePath);
         protocol = dataSourceOptions.get(PROTOCOL_KEY).orElse(protocol);
         eventTimeFieldName = dataSourceOptions.get(EVENT_TIME_FIELD_NAME_KEY).orElse(eventTimeFieldName);
-
-        System.out.println ("Protocol: " + protocol);
-        System.out.println ("Host: " + host);
-        System.out.println ("Base URL: " + url);
+        jsonFieldName = dataSourceOptions.get(JSON_FIELD_NAME_KEY).orElse(jsonFieldName);
 
         return new StroomDataSourceReader(schema, protocol, host, url,
                 searchPath, destroyPath, datasourcePath,
                 token,
-                indexUUID, extractionPipelineUUID, eventTimeFieldName);
+                indexUUID, extractionPipelineUUID,
+                eventTimeFieldName,jsonFieldName);
     }
 }

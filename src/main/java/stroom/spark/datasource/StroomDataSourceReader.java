@@ -11,12 +11,12 @@ import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
 import org.apache.spark.sql.sources.v2.reader.InputPartition;
 import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters;
 import org.apache.spark.sql.types.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import stroom.datasource.api.v2.AbstractField;
 import stroom.datasource.api.v2.DataSource;
 import stroom.docref.DocRef;
 import stroom.query.api.v2.ExpressionTerm;
-import stroom.query.api.v2.SearchResponse;
-
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
@@ -24,19 +24,15 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.locks.Condition;
+
 
 import static stroom.spark.datasource.StroomDataSource.*;
 
-//Could extend SupportsPushDownFilters and/or SupportsPushDownRequiredColumns
-//and/or other subinterfaces of DataSourceReader
-// https://spark.apache.org/docs/2.4.3/api/java/index.html?org/apache/spark/sql/sources/v2/DataSourceV2.html
 public class StroomDataSourceReader implements DataSourceReader, SupportsPushDownFilters {
 
     private final String eventTimeFieldName;
-
+    private final String jsonFieldName;
     private final String host;
     private final String url;
     private final String token;
@@ -47,14 +43,16 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     private final String extractionPipelineUUID;
     private StroomQuery stroomQuery=null;
     private StroomSearcher searcher;
-    private StructType schema = null;
+    private StructType schema;
     private int numPartitions = 3;
     private int pageSize = 10000;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(StroomDataSourceReader.class);
 
     StroomDataSourceReader(final StructType initialSchema, final String protocol, final String host,
                            final String baseURI, final String searchPath, final String destroyPath, final String datasourcePath,
                            final String token, final String indexUUID, final String extractionPipelineUUID,
-                           final String eventTimeFieldName){
+                           final String eventTimeFieldName, final String jsonFieldName){
         this.host = host;
         this.url = baseURI + "/" + searchPath;
         this.destroyUrl = baseURI + "/" + destroyPath;
@@ -66,7 +64,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         this.indexUUID = indexUUID;
         this.extractionPipelineUUID = extractionPipelineUUID;
         this.eventTimeFieldName = eventTimeFieldName;
-
+        this.jsonFieldName = jsonFieldName;
         this.schema = readSchema(initialSchema);
     }
 
@@ -86,7 +84,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
             //The Json field that can be used to extract all items using Spark
             fieldList.add(new StructField("json", DataTypes.StringType, true,
-                            new MetadataBuilder().putString(XPATH_METADATA_KEY,".").build()));
+                            new MetadataBuilder().putString(FIELD_CONTENT_METADATA_KEY,jsonFieldName).build()));
 
             DataSource dataSource = interrogateDatasource();
 
@@ -95,10 +93,11 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
                     MetadataBuilder fieldMetadataBuilder = new MetadataBuilder().putString(INDEXED_FIELD_METADATA_KEY,
                             field.getName());
 
-                    for (ExpressionTerm.Condition condition : field.getConditions()) {
-                        System.out.println ("Field " + field.getName() + " supports " + condition.name());
-                        fieldMetadataBuilder.putString(condition.name(), "supported");
-                    }
+                        for (ExpressionTerm.Condition condition : field.getConditions()) {
+                            LOGGER.debug ("Field " + field.getName() + " supports " + condition.name());
+                            fieldMetadataBuilder.putString(condition.name(), "supported");
+                        }
+
 
                     fieldList.add(new StructField("idx" + field.getName(), DataTypes.StringType, false,
                             fieldMetadataBuilder.build()));
@@ -106,10 +105,10 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
             }
 
             schema = new StructType(fieldList.toArray(new StructField[fieldList.size()]));
-            System.out.println ("Schema initialised.");
+
         }
 
-        System.out.println ("Schema provided as " + schema);
+        LOGGER.debug("Schema provided as " + schema);
         return schema;
     }
 
@@ -120,8 +119,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
         String fullUrl = protocol + "://"+ host + "/" + datasourceUrl;
 
-        if (VERBOSE_DEBUG)
-            System.out.println("Interrogate datasource - connecting to " + fullUrl);
+        LOGGER.debug("Interrogate datasource - connecting to " + fullUrl);
 
         final ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -168,10 +166,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
         String responseBody = response.readEntity(String.class);
 
-        if (VERBOSE_DEBUG) {
-            System.out.println ("Response follows...");
-            System.out.println (responseBody);
-        }
+        LOGGER.debug("Response received", responseBody);
 
         DataSource dataSource;
 

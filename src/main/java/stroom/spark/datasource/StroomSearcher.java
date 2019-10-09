@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import stroom.query.api.v2.*;
 
 import javax.ws.rs.client.Client;
@@ -18,10 +20,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static stroom.spark.datasource.StroomDataSource.*;
 
 public class StroomSearcher {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(StroomSearcher.class);
 
     private String host;
     private String url;
@@ -83,17 +85,13 @@ public class StroomSearcher {
 
         String fullUrl = protocol + "://"+ host + "/" + url;
 
-        if (VERBOSE_DEBUG)
-            System.out.println("Connecting to " + fullUrl);
+        LOGGER.debug("Connecting to " + fullUrl);
 
         final ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
         mapper.configure(SerializationFeature.INDENT_OUTPUT, false);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        // Enabling default typing adds type information where it would otherwise be ambiguous, i.e. for abstract classes
-//        mapper.enableDefaultTyping();
-        //   mapper.writeValue(outputStream, objectModel);
 
         String json = null;
 
@@ -104,8 +102,7 @@ public class StroomSearcher {
             throw new IllegalArgumentException("Unable to serialize the search request");
         }
         if (firstRequest){
-            System.out.println ("Request follows...");
-            System.out.println (json);
+            LOGGER.debug ("Request made", json);
             firstRequest = false;
         }
 
@@ -116,8 +113,7 @@ public class StroomSearcher {
                 .header("Authorization", "Bearer " + token)
                 .accept(MediaType.APPLICATION_JSON_TYPE)
                 .post(Entity.json(json));
-        //       .post(Entity.json(searchRequest));
-        //   .post(Entity.json(json));
+
         if (response.getStatus() != 200) {
             System.err.println("Output...");
             System.err.println(response.readEntity(String.class));
@@ -135,10 +131,7 @@ public class StroomSearcher {
         }
 
         String responseBody = response.readEntity(String.class);
-        if (VERBOSE_DEBUG) {
-            System.out.println ("Response follows...");
-            System.out.println (responseBody);
-        }
+        LOGGER.debug ("Response received", responseBody);
 
         SearchResponse searchResponse;
 
@@ -149,7 +142,6 @@ public class StroomSearcher {
             throw new IllegalArgumentException("Unable to read response");
 
         }
-        //assume one Result object in the response
 
         TableResult tableResult = null;
         if (searchResponse != null && searchResponse.getResults() != null &&

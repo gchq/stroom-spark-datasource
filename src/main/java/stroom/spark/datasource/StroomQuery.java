@@ -360,11 +360,11 @@ public class StroomQuery {
                 fieldsAreIndex[i] = false;
                 StructField field = schema.fields()[i];
 
-                if (field.metadata().contains(XPATH_METADATA_KEY)) {
+                if (field.metadata().contains(FIELD_CONTENT_METADATA_KEY)) {
                     builder.addFields(
                             new Field.Builder()
                                     .name (DUMMY_FIELD_NAME)  //(field.name())
-                                    .expression("${" + field.metadata().getString(XPATH_METADATA_KEY) + "}")
+                                    .expression("${" + field.metadata().getString(FIELD_CONTENT_METADATA_KEY) + "}")
                                     .build());
                 } else if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
                     fieldsAreIndex[i] = true;
