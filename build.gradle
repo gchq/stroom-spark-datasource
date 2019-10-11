@@ -1,5 +1,18 @@
-
-
+/*
+ * Copyright 2019 Crown Copyright
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 buildscript {
     if(JavaVersion.current() != JavaVersion.VERSION_1_8)
         throw new GradleException("This build requires Java 8. Current SDK version is "+JavaVersion.current())
@@ -113,9 +126,9 @@ dependencies {
 
     // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
     //compile group: 'org.apache.spark', name: 'spark-sql_2.12', version: "${versions.spark}"
-    compile "${libs.spark_catalyst}"
-    compile "${libs.spark_sql}"
-    compile "${libs.spark_unsafe}"
+    implementation "${libs.spark_catalyst}"
+    implementation "${libs.spark_sql}"
+    implementation "${libs.spark_unsafe}"
 
     compile "${libs.slf4j_api}"
     compile "${libs.jackson_annotations}"
@@ -141,6 +154,18 @@ def pomConfig = {
     scm {
         url "https://github.com/stroom/stroom-spark-datasource"
     }
+}
+
+//create a single Jar with all dependencies
+task fatJar(type: Jar) {
+    classifier = 'all'
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+task copyLibs(type: Copy) {
+    into "$buildDir/runlibs"
+    from configurations.compile
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
@@ -211,51 +236,6 @@ afterEvaluate {
     }
 
 
-    //Following section commented out as it is not compatible with JDK v8
-    // reinclude for JDK 9+ Module style compilation (--module-path javac option, etc)
-    // also -html5 javadoc option which is only available in later versions of javadoc
-//    compileJava {
-//        inputs.property("moduleName", moduleName)
-//        doFirst {
-//            options.compilerArgs = [
-//                    '--module-path', classpath.asPath,
-//            ]
-//            classpath = files()
-//        }
-//    }
-//
-//    compileTestJava {
-//        inputs.property("moduleName", moduleName)
-//        doFirst {
-//            options.compilerArgs = [
-//                    '--module-path', classpath.asPath,
-//                    '--patch-module', "$moduleName=" + files(sourceSets.test.java.srcDirs).asPath,
-//            ]
-//            classpath = files()
-//        }
-//    }
-//
-//    test {
-//        useJUnitPlatform()
-//
-//        inputs.property("moduleName", moduleName)
-//        doFirst {
-//            jvmArgs = [
-//
-//                   '--module-path', classpath.asPath,
-//                    '--add-modules', 'ALL-MODULE-PATH',
-//                    '--patch-module', "$moduleName=" + files(sourceSets.test.java.outputDir).asPath,
-////                    '--add-opens', 'java.base/java.net=ALL-UNNAMED', // add the following VM parameters to the run configuration to avoid problems with the reflection restrictions in Java 9
-////                    '--add-opens', 'stroom.expression/stroom.dashboard.expression.v1=org.junit.platform.commons',
-//            ]
-//            classpath = files()
-//        }
-//    }
-
-//    javadoc {
-//        options.addStringOption('-module-path', classpath.asPath)
-//       options.addStringOption('Xdoclint:all,-missing', '-html5')
-//   }
 
     jar {
         inputs.property("moduleName", moduleName)

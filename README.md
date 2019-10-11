@@ -1,24 +1,78 @@
 # stroom-spark-datasource
-This creates a single jar file that can be loaded into Spark.
-On a single node it is possible to run the command
-`
-pyspark --jars target/stroom-datasource-1.0-SNAPSHOT.jar,lib/stroom-query-api-v2.1-beta.21.jar,lib/jersey-media-json-jackson-2.25.1.jar,lib/jersey-entity-filtering-2.25.1.jar,lib/jackson-jaxrs-json-provider-2.8.6.jar,lib/jackson-annotations-2.8.6.jar,lib/jackson-core-2.8.6.jar,lib/jackson-jaxrs-base-2.8.6.jar
-`
+
+[![Build Status](https://travis-ci.org/gchq/stroom-spark-datasource.svg?branch=master)](https://travis-ci.org/gchq/stroom-spark-datasource)
+
+##Overview
+
+This project provides an Apache Spark DataSource for Stroom.
+
+Using this library it is possible to search Stroom indexes from Apache Spark, both via the DSL and via Spark SQL.
+
+This DataSource is compatible with Apache Spark v2.4.3, but it might also work without modification on similar versions
+of Apache Spark.
+
+##Building
+
+The project is built with gradle.
+
+Running command `gradle build` will compile the software and build the library jar file.
+
+However, in order to simplify deployment, it is possible to run the command `gradle build fatJar` in order to create a
+single jar file that contains the library itself plus all its dependencies.     
+
+Key facts:
+* Output Directory: `build/libs`
+* Library: `stroom-spark-datasource-VERSION.jar`
+* Fat Jar: `stroom-spark-datasource-VERSION-all.jar`
+
+##Getting Started
+
+The simple demonstrations of this capability that are contained within this repository all rely on there being
+a Stroom running on `localhost`, into which the standard Stroom content and sample data has been loaded by running the
+command `gradle setupSampleData` from the directory containing your git clone of the `stroom` git repository. 
+
+These demonstrations are designed to show the datasource operating in its simplest configuration, for clarity.
+For this reason, security has been disabled within Stroom, by setting the property `authenticationRequired : false` within
+`local.yml`.
+A real deployment would require a user account to be created within Stroom and for it to be assigned an authentication
+token, that is then passed in when instantiating the Datasource.
+
+Install Apache Spark on `localhost`.  Spark currently requires Java 8, therefore this must be available and `$JAVA_HOME`
+set to point at the Java 8 JDK.
+
+On such a single spark node, the python CLI can be started from a Java 8 shell using 
+the command 
+```
+pyspark --jars `pwd`/build/libs/stroom-spark-datasource-VERSION-all.jar
+``` 
+ **- remember to replace VERSION with the version of the library that you are actually using!**
 
 Then from within pyspark shell, try
 ```
 from pyspark.sql.types import *
-mystruct = StructType([StructField("User", StringType(), True, metadata={"xpath": "EventSource/User/Id"}), StructField("Operation", StringType(), True, metadata={"xpath": "EventDetail/TypeId"})])
 
-df = spark.read.format('stroom.spark.datasource.StroomDataSource').load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0', schema=mystruct)
+xpathSchema = StructType([StructField("user", StringType(), True, \
+    metadata={"get": "EventSource/User/Id"}),\
+    StructField("operation", StringType(), True,\
+    metadata={"get": "EventDetail/TypeId"})])
 
-df.filter((df['User'] == 'user1') | (df['User'] == 'user2') | (df['User'] == 'user3')).groupBy(df['Operation']).count().show()
+df = spark.read.format('stroom.spark.datasource.StroomDataSource').\
+    load(token='not required',host='localhost:8080', \
+    protocol='http', \
+    uri='api/stroom-index/v2', \
+    index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44', \
+    pipeline='26ed1000-255e-4182-b69b-00266be891ee', \
+    schema=xpathSchema)
+
+df.filter((df['user'] == 'user1') | (df['user'] == 'user2') | (df['user'] == 'user3')).\
+    groupBy(df['operation']).count().show()
 
 ```
-
+#Not Working
 Without defining a schema, certain basic operations are possible using a built in (default schema)
 ```
-basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0')
+basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').\
+    load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0')
 
 basicDf.groupBy(basicDf['StreamId']).count().sort(['count'], ascending=False).show()
 ```
