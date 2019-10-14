@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/gchq/stroom-spark-datasource.svg?branch=master)](https://travis-ci.org/gchq/stroom-spark-datasource)
 
-##Overview
+## Overview
 
 This project provides an Apache Spark DataSource for Stroom.
 
@@ -11,7 +11,7 @@ Using this library it is possible to search Stroom indexes from Apache Spark, bo
 This DataSource is compatible with Apache Spark v2.4.3, but it might also work without modification on similar versions
 of Apache Spark.
 
-##Building
+## Building
 
 The project is built with gradle.
 
@@ -25,7 +25,7 @@ Key facts:
 * Library: `stroom-spark-datasource-VERSION.jar`
 * Fat Jar: `stroom-spark-datasource-VERSION-all.jar`
 
-##Getting Started
+## Getting Started
 
 The simple demonstrations of this capability that are contained within this repository all rely on there being
 a Stroom running on `localhost`, into which the standard Stroom content and sample data has been loaded by running the
@@ -49,7 +49,7 @@ pyspark --jars `pwd`/build/libs/stroom-spark-datasource-VERSION-all.jar
 
 Then from within pyspark shell, try
 
-```
+```python
 from pyspark.sql.types import *
 
 basicSchema = StructType([StructField("streamId", StringType(), True, \
@@ -68,7 +68,7 @@ basicDf.groupBy(basicDf['streamId']).count().sort(['count'], ascending=False).sh
 ```
 
 When using a JSON Search extraction pipeline within Stroom, it is possible to work with the JSON directly in Spark.
-```
+```python
 from pyspark.sql.functions import from_json, col
 
 json_schema = spark.read.json(basicDf.rdd.map(lambda row: row.json)).schema
@@ -88,7 +88,7 @@ wideDf.filter((wideDf['User'] == 'user1') | (wideDf['User'] == 'user2') |
 
 If you are running a version of Stroom that supports `XPathOutputFilter`, XPaths can be used to access data directly.
 
-```
+```python
 from pyspark.sql.types import *
 
 xpathSchema = StructType([StructField("user", StringType(), True, \
