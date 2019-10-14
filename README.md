@@ -48,6 +48,46 @@ pyspark --jars `pwd`/build/libs/stroom-spark-datasource-VERSION-all.jar
  **- remember to replace VERSION with the version of the library that you are actually using!**
 
 Then from within pyspark shell, try
+
+```
+from pyspark.sql.types import *
+
+basicSchema = StructType([StructField("streamId", StringType(), True, \
+    metadata={"get": "StreamId"}),\
+    StructField("eventId", StringType(), True,\
+    metadata={"get": "EventId"})])
+
+basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').\
+    load(token='not required',host='localhost:8080',
+    protocol='http',uri='api/stroom-index/v2',
+    index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',
+    pipeline='13143179-b494-4146-ac4b-9a6010cada89',
+    schema=basicSchema)
+
+basicDf.groupBy(basicDf['streamId']).count().sort(['count'], ascending=False).show()
+```
+
+When using a JSON Search extraction pipeline within Stroom, it is possible to work with the JSON directly in Spark.
+```
+from pyspark.sql.functions import from_json, col
+
+json_schema = spark.read.json(basicDf.rdd.map(lambda row: row.json)).schema
+json_schema
+
+structuredDf = basicDf.withColumn('evt', from_json(col('json'), json_schema))
+
+wideDf=structuredDf.withColumn ('timestamp', col('evt.EventTime.TimeCreated')).\
+    withColumn ('user', col('evt.EventSource.User.Id')).\
+    withColumn('operation', col('evt.EventDetail.TypeId'))
+
+wideDf.show()
+
+wideDf.filter((wideDf['User'] == 'user1') | (wideDf['User'] == 'user2') | 
+    (wideDf['User'] == 'user3')).groupBy(wideDf['Operation']).count().show()
+```
+
+If you are running a version of Stroom that supports `XPathOutputFilter`, XPaths can be used to access data directly.
+
 ```
 from pyspark.sql.types import *
 
@@ -67,30 +107,6 @@ df = spark.read.format('stroom.spark.datasource.StroomDataSource').\
 df.filter((df['user'] == 'user1') | (df['user'] == 'user2') | (df['user'] == 'user3')).\
     groupBy(df['operation']).count().show()
 
-```
-#Not Working
-Without defining a schema, certain basic operations are possible using a built in (default schema)
-```
-basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').\
-    load(token='not required',host='localhost:8080',protocol='http',search_url='api/stroom-index/v2/search',destroy_url='api/stroom-index/v2/destroy',index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44',pipeline='bb25824e-6369-464a-81e1-876ffe3b95a0')
-
-basicDf.groupBy(basicDf['StreamId']).count().sort(['count'], ascending=False).show()
-```
-
-When working with JSON, it is possible to work with the JSON directly in Spark, rather than by specifying XPaths.
-```
-from pyspark.sql.functions import from_json, col
-
-json_schema = spark.read.json(basicDf.rdd.map(lambda row: row.Event)).schema
-json_schema
-
-structuredDf = basicDf.withColumn('evt', from_json(col('Event'), json_schema))
-
-wideDf=structuredDf.withColumn ('timestamp', col('evt.Event.EventTime.TimeCreated')).withColumn ('user', col('evt.Event.EventSource.User.Id')).withColumn('operation', col('evt.Event.EventDetail.TypeId'))
-
-wideDf.show()
-
-wideDf.filter((wideDf['User'] == 'user1') | (wideDf['User'] == 'user2') | (wideDf['User'] == 'user3')).groupBy(wideDf['Operation']).count().show()
 ```
 
 
