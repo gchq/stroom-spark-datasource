@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
 
-## [v0.1-alpha.1] - 2019-10-14
+## [v1.0-alpha.1] - 2019-10-14
 
 * Initial alpha release
 
-[Unreleased]: https://github.com/gchq/stroom-spark-datasource/compare/v0.1-alpha.1...HEAD
-[v0.1-alpha.1]: https://github.com/gchq/stroom-spark-datasource/compare/v0.1-alpha.1...v0.1-alpha.1
+[Unreleased]: https://github.com/gchq/stroom-spark-datasource/compare/v1.0-alpha.1...HEAD
+[v1.0-alpha.1]: https://github.com/gchq/stroom-spark-datasource/compare/v1.0-alpha.1...v1.0-alpha.1
