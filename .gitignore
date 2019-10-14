@@ -5,3 +5,4 @@ target/
 build/
 *.log
 metastore_db/
+out/
