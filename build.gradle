@@ -51,11 +51,11 @@ ext.getPropertyOrDefault = { propName, defaultValue ->
 
 ext.versions = [
         //----------This project-----------------------
-        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.1'),
+        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.2_stroom-v6.x'),
 
         //----------Stroom dependencies---------------
-        stroomExpression  : 'v3.0.0',
-        stroomQuery  : 'v4.0-beta.38',
+        stroomExpression  : 'v1.5.3',
+        stroomQuery  : 'v2.2.3',
 
 
         //-------------3rd party libs-----------------
@@ -75,7 +75,7 @@ ext.libs = [
         //------Stroom-libs---------------
         stroomExpression    : "stroom:stroom-expression:$versions.stroomExpression",
         stroomQuery    : "stroom:stroom-query-api:$versions.stroomQuery",
-        stroomDocRef    : "stroom:stroom-docref:$versions.stroomQuery",
+     //   stroomDocRef    : "stroom:stroom-docref:$versions.stroomQuery",
 
         //------------3rd-party------------
         assertj_core        : 'org.assertj:assertj-core:3.10.0',
@@ -120,9 +120,9 @@ repositories {
 }
 
 dependencies {
-    compile "${libs.stroomDocRef}"
+  //  compile "${libs.stroomDocRef}"
     compile "${libs.stroomQuery}"
-//    compile "${libs.stroomExpression}"
+   // compile "${libs.stroomExpression}"
 
     // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
     //compile group: 'org.apache.spark', name: 'spark-sql_2.12', version: "${versions.spark}"

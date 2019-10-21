@@ -130,21 +130,6 @@ public class StroomQuery {
                     unpushedFilters.add(filter);
                 }
 
-            } else if (filters[i] instanceof IsNotNull){
-                IsNotNull filter = (IsNotNull) filters[i];
-
-                if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.IS_NOT_NULL.name()) != null){
-                    term = new ExpressionTerm.Builder().
-                            field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.IS_NOT_NULL).
-
-                            build();
-                    pushedFilters.add(filter);
-
-                } else {
-                    unpushedFilters.add(filter);
-                }
 
             } else if (filters[i] instanceof GreaterThan){
                 GreaterThan filter = (GreaterThan) filters[i];

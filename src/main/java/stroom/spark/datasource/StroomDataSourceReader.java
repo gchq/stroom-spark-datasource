@@ -28,9 +28,9 @@ import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters;
 import org.apache.spark.sql.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import stroom.datasource.api.v2.AbstractField;
 import stroom.datasource.api.v2.DataSource;
-import stroom.docref.DocRef;
+import stroom.datasource.api.v2.DataSourceField;
+import stroom.query.api.v2.DocRef;
 import stroom.query.api.v2.ExpressionTerm;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -103,7 +103,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
             DataSource dataSource = interrogateDatasource();
 
-            for (AbstractField field : dataSource.getFields()){
+            for (DataSourceField field : dataSource.getFields()){
                 if (field.getQueryable()) {
                     MetadataBuilder fieldMetadataBuilder = new MetadataBuilder().putString(INDEXED_FIELD_METADATA_KEY,
                             field.getName());
