@@ -38,12 +38,14 @@ public class StroomInputPartition implements InputPartition<InternalRow>, Serial
     private final String indexUUID;
     private final String extractionPipelineUUID;
     private final String eventTimeFieldName;
+    private final int traceLevel;
+    private final int maxResults;
 
     public StroomInputPartition(final StructType schema, final String protocol, final String host, final String url, final String destroyUrl,
                                 final String token, final String queryRequestId, final int pageSize,
                                 final int partitionId, final int numberOfPartitions,
                                 final String indexUUID, final String extractionPipelineUUID,
-                                final String eventTimeFieldName) {
+                                final String eventTimeFieldName, int maxResults, int traceLevel) {
         this.schema = schema;
         this.protocol = protocol;
         this.host = host;
@@ -57,11 +59,14 @@ public class StroomInputPartition implements InputPartition<InternalRow>, Serial
         this.indexUUID = indexUUID;
         this.extractionPipelineUUID = extractionPipelineUUID;
         this.eventTimeFieldName = eventTimeFieldName;
+        this.maxResults = maxResults;
+        this.traceLevel = traceLevel;
     }
 
     public InputPartitionReader <InternalRow> createPartitionReader() {
         StroomSearcher searcher = new StroomSearcher(schema,protocol,host,url,destroyUrl,token);
-        StroomQuery query = new StroomQuery(indexUUID, extractionPipelineUUID, schema, queryRequestId, eventTimeFieldName);
+        searcher.setTraceLevel(traceLevel);
+        StroomQuery query = new StroomQuery(indexUUID, extractionPipelineUUID, schema, queryRequestId, eventTimeFieldName,maxResults);
         return new StroomInputPartitionReader(searcher, query, pageSize, partitionId, numberOfPartitions);
     }
 }

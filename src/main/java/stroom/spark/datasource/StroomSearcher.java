@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.RamDiskReplicaLruTracker;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
 import org.slf4j.Logger;
@@ -34,10 +35,11 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Random;
 
 
 public class StroomSearcher {
-
+    private static final int MAX_SEARCH_INTERVAL = 60000;
     private static final Logger LOGGER = LoggerFactory.getLogger(StroomSearcher.class);
 
     private String host;
@@ -46,6 +48,8 @@ public class StroomSearcher {
     private String token;
     private String protocol;
 
+    private Random random = new Random();
+    private int traceLevel = 0;
 
 
     public StroomSearcher(StructType schema, String protocol, String host, String url, String destroyURL, String token) {
@@ -55,6 +59,14 @@ public class StroomSearcher {
         this.protocol = protocol;
         this.destroyURL = destroyURL;
 
+    }
+
+    /**
+     * Change what request/response information is output to stdout (for diagnostic purposes)
+     * @param level 0=none;1=1st request only;2=1st request and response;3=All initial requests and 1st response;4=All initial only;5=All
+     */
+    public void setTraceLevel(int level){
+        traceLevel = level;
     }
 
     public List<Row> searchAndReadResults (final SearchRequest searchRequest) {
@@ -70,7 +82,9 @@ public class StroomSearcher {
             }
 
             sleepMs = 5 * sleepMs;
-
+            if (sleepMs > MAX_SEARCH_INTERVAL){
+                sleepMs = MAX_SEARCH_INTERVAL;
+            }
         } while ((result = performSearch(searchRequest)).moreExpected);
 
         return result.rows;
@@ -82,6 +96,41 @@ public class StroomSearcher {
     public static class StroomSearchResult{
         public boolean moreExpected = false;
         public List<Row> rows = null;
+    }
+
+    private void trace (String type, String details){
+        System.out.println (type + " follows:");
+        System.out.println (details);
+    }
+    private void traceRequest (String request, boolean queryProvided){
+        if (firstRequest)
+            LOGGER.debug ("Request made", request);
+
+        if (traceLevel < 1)
+            return;
+
+        if ((traceLevel < 5) && !firstRequest)
+            return;
+
+        if ((traceLevel < 3) && !queryProvided)
+            return;
+
+        trace("Request", request);
+    }
+    private void traceResponse (String response, boolean queryProvided){
+        if (firstRequest)
+            LOGGER.debug ("Response received", response);
+
+        if (traceLevel < 2)
+            return;
+
+        if ((traceLevel < 5) && !firstRequest)
+            return;
+
+        if ((traceLevel < 4) && !queryProvided)
+            return;
+
+        trace("Response", response);
     }
 
     public StroomSearchResult performSearch(final SearchRequest searchRequest) {
@@ -111,11 +160,10 @@ public class StroomSearcher {
             e.printStackTrace();
             throw new IllegalArgumentException("Unable to serialize the search request");
         }
-        if (firstRequest){
-            LOGGER.debug ("Request made", json);
-            firstRequest = false;
-        }
 
+        boolean searchProvided = (searchRequest.getQuery() == null);
+
+        traceRequest(json, searchProvided);
 
         Response response = client.target(fullUrl)
 
@@ -141,7 +189,7 @@ public class StroomSearcher {
         }
 
         String responseBody = response.readEntity(String.class);
-        LOGGER.debug ("Response received", responseBody);
+        traceResponse(responseBody, searchProvided);
 
         SearchResponse searchResponse;
 
@@ -169,6 +217,9 @@ public class StroomSearcher {
             result.rows = tableResult.getRows();
             result.moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.complete();
         }
+
+        firstRequest = false;
+
         return result;
     }
 

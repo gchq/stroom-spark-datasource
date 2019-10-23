@@ -51,7 +51,7 @@ ext.getPropertyOrDefault = { propName, defaultValue ->
 
 ext.versions = [
         //----------This project-----------------------
-        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.1'),
+        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.4'),
 
         //----------Stroom dependencies---------------
         stroomExpression  : 'v3.0.0',
