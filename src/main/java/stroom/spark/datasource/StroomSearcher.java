@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.RamDiskReplicaLruTracker;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
 import org.slf4j.Logger;
@@ -34,10 +35,11 @@ import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Random;
 
 
 public class StroomSearcher {
-
+    private static final int MAX_SEARCH_INTERVAL = 60000;
     private static final Logger LOGGER = LoggerFactory.getLogger(StroomSearcher.class);
 
     private String host;
@@ -46,7 +48,7 @@ public class StroomSearcher {
     private String token;
     private String protocol;
 
-
+    private Random random = new Random();
     private int traceLevel = 0;
 
 
@@ -80,7 +82,9 @@ public class StroomSearcher {
             }
 
             sleepMs = 5 * sleepMs;
-
+            if (sleepMs > MAX_SEARCH_INTERVAL){
+                sleepMs = MAX_SEARCH_INTERVAL;
+            }
         } while ((result = performSearch(searchRequest)).moreExpected);
 
         return result.rows;
