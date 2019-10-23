@@ -59,15 +59,20 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     private StroomQuery stroomQuery=null;
     private StroomSearcher searcher;
     private StructType schema;
-    private int numPartitions = 3;
-    private int pageSize = 10000;
+    private final int numPartitions;
+    private final int pageSize;
+    private final int maxResults;
+
+    private final int traceLevel;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StroomDataSourceReader.class);
 
     StroomDataSourceReader(final StructType initialSchema, final String protocol, final String host,
                            final String baseURI, final String searchPath, final String destroyPath, final String datasourcePath,
                            final String token, final String indexUUID, final String extractionPipelineUUID,
-                           final String eventTimeFieldName, final String jsonFieldName){
+                           final String eventTimeFieldName, final String jsonFieldName,
+                           final int numPartitions, final int pageSize, final int maxResults,
+                           final int traceLevel){
         this.host = host;
         this.url = baseURI + "/" + searchPath;
         this.destroyUrl = baseURI + "/" + destroyPath;
@@ -81,6 +86,10 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         this.eventTimeFieldName = eventTimeFieldName;
         this.jsonFieldName = jsonFieldName;
         this.schema = readSchema(initialSchema);
+        this.traceLevel = traceLevel;
+        this.numPartitions = numPartitions;
+        this.pageSize = pageSize;
+        this.maxResults = maxResults;
     }
 
     public StructType readSchema(){
@@ -198,6 +207,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
 
     public List<InputPartition<InternalRow>> planInputPartitions() {
         searcher = new StroomSearcher(schema,protocol,host,url,destroyUrl,token);
+        searcher.setTraceLevel(traceLevel);
 
         searcher.performSearch(stroomQuery.createInitialSearchRequest());
 
@@ -206,7 +216,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         for (int i = 0; i < numPartitions; i++){
             partitions.add(new StroomInputPartition(schema, protocol, host, url, destroyUrl, token,
                     stroomQuery.getQueryRequestKey(), pageSize, i, numPartitions, indexUUID, extractionPipelineUUID,
-                    eventTimeFieldName));
+                    eventTimeFieldName, maxResults, traceLevel));
         }
 
 
@@ -216,7 +226,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     @Override
     public Filter[] pushFilters(Filter[] filters) {
 
-        stroomQuery = new StroomQuery(indexUUID, extractionPipelineUUID, schema, filters, eventTimeFieldName);
+        stroomQuery = new StroomQuery(indexUUID, extractionPipelineUUID, schema, filters, eventTimeFieldName,maxResults);
 
 
         for (int i = 0; i < filters.length; i++)

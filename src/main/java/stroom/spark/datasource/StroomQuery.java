@@ -39,31 +39,33 @@ public class StroomQuery {
     private Query query;
     private final String queryRequestKey;
     private final StructType schema;
-
+    private final int maxResults;
 
 
     private ArrayList<Filter> pushedIndexedFilters = new ArrayList<Filter>();
     private ArrayList<Filter> unpushedIndexedFilters = new ArrayList<Filter>();
 
 
-    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, Filter[] initialFilters, final String eventTimeFieldName){
+    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, Filter[] initialFilters, final String eventTimeFieldName, int maxResults){
         this.indexUUID = indexUUID;
         this.extractionPipelineUUID = extractionPipelineUUID;
         this.schema = schema;
         queryRequestKey = UUID.randomUUID().toString();
         this.eventTimeFieldName = eventTimeFieldName;
+        this.maxResults = maxResults;
 
         initTableSettings(false);
         initQuery(initialFilters);
 
     }
 
-    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, final String queryRequestKey, final String eventTimeFieldName){
+    public StroomQuery (final String indexUUID, final String extractionPipelineUUID, final StructType schema, final String queryRequestKey, final String eventTimeFieldName, int maxResults){
         this.queryRequestKey = queryRequestKey;
         this.indexUUID = indexUUID;
         this.extractionPipelineUUID = extractionPipelineUUID;
         this.schema = schema;
         this.eventTimeFieldName = eventTimeFieldName;
+        this.maxResults = maxResults;
 
         initTableSettings(true);
     }
@@ -338,7 +340,7 @@ public class StroomQuery {
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
                         extractionPipelineUUID,
                         EXTRACTION_PIPELINE_NAME)
-                .addMaxResults(1000000)
+                .addMaxResults(maxResults)
                 .extractValues(true);
 
         if (dummy){
