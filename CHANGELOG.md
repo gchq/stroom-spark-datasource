@@ -12,13 +12,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
 
+## [v1.0-alpha.4] - 2019-10-30
+Equivalent of [v1.0-alpha.4_stroom-v6.x] but designed to be compatible with Stroom v7
+
 ## [v1.0-alpha.4_stroom-v6.x] - 2019-10-23
 
 ### Changed
 
 Will never wait more than 60s between search intervals, to ensure result set kept alive
-
-
 
 ## [v1.0-alpha.3_stroom-v6.x] - 2019-10-23
 
