@@ -21,11 +21,12 @@ buildscript {
         maven { url "https://dl.bintray.com/stroom/stroom" }
     }
     dependencies {
-        // A fork of https://github.com/wfhartford/gradle-dependency-analyze that works with Java 10
-        classpath 'stroom:gradle-dependency-analyze:v2.2.5'
-
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
     }
+}
+
+plugins {
+    id "ca.cutterslade.analyze" version "1.6.0"
 }
 
 apply plugin: 'java-library'
@@ -33,7 +34,7 @@ apply plugin: 'idea'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
-apply plugin: 'ca.cutterslade.analyze'
+//apply plugin: 'ca.cutterslade.analyze'
 
 //if the project has a value for the passed property (i.e from the cmd line via -PpropName=xxx)
 //use that, else use a default value
@@ -51,11 +52,7 @@ ext.getPropertyOrDefault = { propName, defaultValue ->
 
 ext.versions = [
         //----------This project-----------------------
-        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.4'),
-
-        //----------Stroom dependencies---------------
-        stroomExpression  : 'v3.0.0',
-        stroomQuery  : 'v4.0-beta.38',
+        stroomSparkDatasource: getPropertyOrDefault('version', 'v2.0-alpha.1'),
 
 
         //-------------3rd party libs-----------------
@@ -64,7 +61,7 @@ ext.versions = [
         javax_rs: '2.0.1',
 
         slf4j : '1.7.25',
-        spark : '2.12:2.4.3',
+        spark : '2.12:2.4.7',
 
         //--------Leave at end----------------------
         zzDUMMYzz       : 'makes sorting this list easier'
@@ -72,10 +69,6 @@ ext.versions = [
 
 // dependency strings for use in sub projects
 ext.libs = [
-        //------Stroom-libs---------------
-        stroomExpression    : "stroom:stroom-expression:$versions.stroomExpression",
-        stroomQuery    : "stroom:stroom-query-api:$versions.stroomQuery",
-        stroomDocRef    : "stroom:stroom-docref:$versions.stroomQuery",
 
         //------------3rd-party------------
         assertj_core        : 'org.assertj:assertj-core:3.10.0',
@@ -120,9 +113,7 @@ repositories {
 }
 
 dependencies {
-    compile "${libs.stroomDocRef}"
-    compile "${libs.stroomQuery}"
-//    compile "${libs.stroomExpression}"
+    compile project (':stroom-api-client')
 
     // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
     //compile group: 'org.apache.spark', name: 'spark-sql_2.12', version: "${versions.spark}"
