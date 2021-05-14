@@ -29,7 +29,7 @@ import java.util.List;
  */
 @Schema(description = "A logical addOperator term in a query expression tree")
 @javax.annotation.Generated(value = "io.swagger.codegen.v3.generators.java.JavaClientCodegen", date = "2021-05-13T17:13:49.037+01:00[Europe/London]")
-public class ExpressionOperator {
+public class ExpressionOperator extends ExpressionItem {
   @SerializedName("children")
   private List<ExpressionItem> children = null;
 
