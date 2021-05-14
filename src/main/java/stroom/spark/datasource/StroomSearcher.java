@@ -20,12 +20,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.swagger.client.model.Row;
+import io.swagger.client.model.SearchRequest;
+import io.swagger.client.model.SearchResponse;
+import io.swagger.client.model.TableResult;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.RamDiskReplicaLruTracker;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import stroom.query.api.v2.*;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -215,7 +218,7 @@ public class StroomSearcher {
 
             tableResult = ((TableResult) searchResponse.getResults().get(0));
             result.rows = tableResult.getRows();
-            result.moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.complete();
+            result.moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.isComplete();
         }
 
         firstRequest = false;

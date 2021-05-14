@@ -15,12 +15,11 @@
  */
 package stroom.spark.datasource;
 
-
+import io.swagger.client.model.Row;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.sources.v2.reader.InputPartitionReader;
 import org.apache.spark.unsafe.types.UTF8String;
-import stroom.query.api.v2.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
