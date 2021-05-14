@@ -136,6 +136,7 @@ public class StroomSearcher {
         trace("Response", response);
     }
 
+    //Todo use the swagger client api call as well as its model.
     public StroomSearchResult performSearch(final SearchRequest searchRequest) {
         StroomSearchResult result = new StroomSearchResult();
 
