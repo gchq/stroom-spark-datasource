@@ -78,14 +78,14 @@ public class TestSwaggerClient {
         WelcomeApi apiInstance = new WelcomeApi(apiClient);
 
         Welcome result = null;
-        Exception e = null;
+        ApiException e = null;
         try {
             result = apiInstance.fetchWelcome();
         }catch (ApiException ex){
             e = ex;
-//            assertThat(ex).withFailMessage(()->"Not got expected failure from Stroom").hasMessageContaining("Unauthorized");
         }
         assertThat(e).withFailMessage("No exception thrown by API").isNotNull();
+        assertThat(e.getCode()).withFailMessage("Expected 401 unauthorized response code").isEqualTo(401);
         assertThat(result).isNull();
     }
 
