@@ -62,6 +62,7 @@ ext.versions = [
 
         slf4j : '1.7.25',
         spark : '2.12:2.4.7',
+        swagger : '2.1.7',
 
         //--------Leave at end----------------------
         zzDUMMYzz       : 'makes sorting this list easier'
@@ -91,6 +92,7 @@ ext.libs = [
         spark_sql               : "org.apache.spark:spark-sql_$versions.spark",
         spark_unsafe               : "org.apache.spark:spark-unsafe_$versions.spark",
         slf4j_api           : "org.slf4j:slf4j-api:$versions.slf4j",
+        swagger_annotations            : "io.swagger.core.v3:swagger-annotations:$versions.swagger",
 
         //--------Leave at end----------------------
         zzDUMMYzz           : "makes sorting easier"
@@ -106,6 +108,7 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenLocal()
+    maven { url "https://repo1.maven.org/maven2" }
     jcenter()
     maven {
         url "https://dl.bintray.com/stroom/stroom"
@@ -113,8 +116,7 @@ repositories {
 }
 
 dependencies {
-    compile project (':stroom-api-client')
-
+    compile project('client')
     // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
     //compile group: 'org.apache.spark', name: 'spark-sql_2.12', version: "${versions.spark}"
     implementation "${libs.spark_catalyst}"
@@ -126,12 +128,18 @@ dependencies {
     compile "${libs.jackson_core}"
     compile "${libs.jackson_databind}"
     compile "${libs.javax_rs}"
+//    compileOnly "${libs.swagger_annotations}"
 
-//    testCompileOnly "org.junit.jupiter:junit-jupiter-api:5.3.2"
-//    testImplementation "org.assertj:assertj-core:3.10.0"
+    testCompileOnly "org.assertj:assertj-core:3.18.1"
+    testCompileOnly "org.junit.jupiter:junit-jupiter-api:5.3.2"
+    testImplementation "org.assertj:assertj-core:3.18.1"
 
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.3.2"
     testRuntimeOnly "org.slf4j:slf4j-nop:1.7.25"
+}
+
+test {
+    useJUnitPlatform()
 }
 
 def pomConfig = {

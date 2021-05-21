@@ -15,15 +15,11 @@
  */
 package stroom.spark.datasource;
 
-import io.swagger.client.ApiClient;
-import io.swagger.client.ApiException;
-import io.swagger.client.Configuration;
-import io.swagger.client.api.DataSourcesApi;
-import io.swagger.client.auth.ApiKeyAuth;
-import io.swagger.client.model.AbstractField;
-import io.swagger.client.model.DataSource;
-import io.swagger.client.model.DocRef;
-import io.swagger.client.model.ExpressionTerm;
+import org.openapitools.client.ApiClient;
+import org.openapitools.client.ApiException;
+import org.openapitools.client.Configuration;
+import org.openapitools.client.api.DataSourcesApi;
+import org.openapitools.client.auth.ApiKeyAuth;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
@@ -32,6 +28,9 @@ import org.apache.spark.sql.sources.v2.reader.SupportsPushDownFilters;
 import org.apache.spark.sql.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import stroom.datasource.api.v2.AbstractField;
+import stroom.docref.DocRef;
+import stroom.query.api.v2.ExpressionTerm;
 
 
 import java.util.ArrayList;
@@ -107,11 +106,11 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
                             new MetadataBuilder().putString(FIELD_CONTENT_METADATA_KEY,jsonFieldName).build()));
 
             for (AbstractField field : interrogateDatasource()){
-                if (field.isQueryable()) {
+                if (field.getQueryable()) {
                     MetadataBuilder fieldMetadataBuilder = new MetadataBuilder().putString(INDEXED_FIELD_METADATA_KEY,
                             field.getName());
 
-                        for (AbstractField.ConditionsEnum condition : field.getConditions()) {
+                        for (ExpressionTerm.Condition condition : field.getConditions()) {
                             LOGGER.debug ("Field " + field.getName() + " supports " + condition.name());
                             fieldMetadataBuilder.putString(condition.name(), "supported");
                         }
@@ -133,10 +132,12 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
     private List<AbstractField> interrogateDatasource (){
 
         ApiClient defaultClient = Configuration.getDefaultApiClient();
+        defaultClient.setBasePath(protocol + "://" + host + "/api");
+        defaultClient.setDebugging(true);
 
         // Configure API key authorization: ApiKeyAuth
         ApiKeyAuth ApiKeyAuth = (ApiKeyAuth) defaultClient.getAuthentication("ApiKeyAuth");
-        ApiKeyAuth.setApiKey("YOUR API KEY");
+        ApiKeyAuth.setApiKey(token);
         // Uncomment the following line to set a prefix for the API key, e.g. "Token" (defaults to null)
         //ApiKeyAuth.setApiKeyPrefix("Token");
 
