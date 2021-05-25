@@ -59,14 +59,3 @@ dependencies {
     testImplementation 'junit:junit:4.12'
 }
 
-
-tasks.register('fatJar', Jar) {
-    archiveClassifier = 'all'
-
-    from sourceSets.main.output
-
-    dependsOn configurations.runtimeClasspath
-    from {
-        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
-    }
-}

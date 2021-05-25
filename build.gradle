@@ -165,27 +165,18 @@ tasks.register('fatJar', Jar) {
     dependsOn configurations.runtimeClasspath
 
 
-        subprojects.forEach {
-            //Include all subprojects
-            from it.configurations.archives.allArtifacts.files.collect {
-                print "Adding subproject jar $it.name\n"
-                zipTree(it)
-            }
-            //And also include their dependencies
-            from it.configurations.runtimeClasspath.collect {
-                print "Adding subproject dep $it.name\n"
-                zipTree(it)
-            }
+    subprojects.forEach {
+        //Include all subprojects
+        from it.configurations.archives.allArtifacts.files.collect {
+            print "Adding subproject jar $it.name\n"
+            zipTree(it)
+        }
+        //And also include their dependencies
+        from it.configurations.runtimeClasspath.collect {
+            print "Adding subproject dep $it.name\n"
+            zipTree(it)
+        }
 
-//
-//        configurations.compileClasspath.findAll {
-//            ["client-all.jar"].collect().contains(it.name)
-//
-//        }
-//                .sort { it.name }.unique().collect {
-//            print "Including $it.name\n"
-//            zipTree(it)
-//        }
     }
 }
 
