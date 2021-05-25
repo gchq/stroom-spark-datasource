@@ -63,4 +63,4 @@ do
   > "${OUTPUT_ROOT}/api/${FILE}"
 done
 
-rm -r ${TEMP}
+#rm -r ${TEMP}

@@ -18,7 +18,7 @@ buildscript {
         throw new GradleException("This build requires Java 8. Current SDK version is "+JavaVersion.current())
     repositories {
         jcenter()
-        maven { url "https://dl.bintray.com/stroom/stroom" }
+//        maven { url "https://dl.bintray.com/stroom/stroom" }
     }
     dependencies {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
@@ -56,12 +56,13 @@ ext.versions = [
 
 
         //-------------3rd party libs-----------------
-        jackson           : '2.9.9',
+//        jackson           : '2.9.9',
 
+        jackson: '2.6.7',
         javax_rs: '2.0.1',
 
         slf4j : '1.7.25',
-        spark : '2.12:2.4.7',
+        spark : '2.12:2.4.3',
         swagger : '2.1.7',
 
         //--------Leave at end----------------------
@@ -110,9 +111,9 @@ repositories {
     mavenLocal()
     maven { url "https://repo1.maven.org/maven2" }
     jcenter()
-    maven {
-        url "https://dl.bintray.com/stroom/stroom"
-    }
+//    maven {
+//        url "https://dl.bintray.com/stroom/stroom"
+//    }
 }
 
 dependencies {
@@ -157,8 +158,23 @@ def pomConfig = {
 
 //create a single Jar with all dependencies
 task fatJar(type: Jar) {
-    classifier = 'all'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+
+    }
+    archiveExtension = 'all.zip'
+    configurations.compile.findAll { file ->
+        // file is of type java.io.File
+        // when true, jar file is unzipped and added
+
+        !file.name.startsWith("spark")
+    }.sort { it.name }
+            .collect { file ->
+
+//                print "Including $file.name\n"
+//                logger.info("Including file: ${file.name}")
+//                file.isDirectory() ? file : zipTree(file)
+                file
+            }
     with jar
 }
 
@@ -175,6 +191,26 @@ task sourcesJar(type: Jar, dependsOn: classes) {
 task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier = 'javadoc'
     from javadoc.destinationDir
+}
+
+tasks.register('uberJar', Jar) {
+    archiveClassifier = 'uber'
+
+    from sourceSets.main.output
+
+    dependsOn configurations.runtimeClasspath
+    from {
+
+
+        configurations.compileClasspath.findAll {
+            ["libToInclude.jar"].collect().contains(it.name)
+
+        }
+                .sort { it.name }.unique().collect {
+            print "Including $it.name\n"
+            zipTree(it)
+        }
+    }
 }
 
 artifacts {

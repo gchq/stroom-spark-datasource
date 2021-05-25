@@ -26,8 +26,8 @@ public class RFC3339DateFormat extends DateFormat {
   private static final TimeZone TIMEZONE_Z = TimeZone.getTimeZone("UTC");
 
   private final StdDateFormat fmt = new StdDateFormat()
-          .withTimeZone(TIMEZONE_Z)
-          .withColonInTimeZone(true);
+          .withTimeZone(TIMEZONE_Z);
+//          .withColonInTimeZone(true);
 
   public RFC3339DateFormat() {
     this.calendar = new GregorianCalendar();
