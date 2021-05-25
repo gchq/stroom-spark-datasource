@@ -157,25 +157,36 @@ def pomConfig = {
 }
 
 //create a single Jar with all dependencies
-task fatJar(type: Jar) {
-    manifest {
+tasks.register('fatJar', Jar) {
+    archiveClassifier = 'all'
 
-    }
-    archiveExtension = 'all.zip'
-    configurations.compile.findAll { file ->
-        // file is of type java.io.File
-        // when true, jar file is unzipped and added
+    from sourceSets.main.output
 
-        !file.name.startsWith("spark")
-    }.sort { it.name }
-            .collect { file ->
+    dependsOn configurations.runtimeClasspath
 
-//                print "Including $file.name\n"
-//                logger.info("Including file: ${file.name}")
-//                file.isDirectory() ? file : zipTree(file)
-                file
+
+        subprojects.forEach {
+            //Include all subprojects
+            from it.configurations.archives.allArtifacts.files.collect {
+                print "Adding subproject jar $it.name\n"
+                zipTree(it)
             }
-    with jar
+            //And also include their dependencies
+            from it.configurations.runtimeClasspath.collect {
+                print "Adding subproject dep $it.name\n"
+                zipTree(it)
+            }
+
+//
+//        configurations.compileClasspath.findAll {
+//            ["client-all.jar"].collect().contains(it.name)
+//
+//        }
+//                .sort { it.name }.unique().collect {
+//            print "Including $it.name\n"
+//            zipTree(it)
+//        }
+    }
 }
 
 task copyLibs(type: Copy) {

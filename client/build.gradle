@@ -60,8 +60,8 @@ dependencies {
 }
 
 
-tasks.register('uberJar', Jar) {
-    archiveClassifier = 'uber'
+tasks.register('fatJar', Jar) {
+    archiveClassifier = 'all'
 
     from sourceSets.main.output
 
