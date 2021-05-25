@@ -31,7 +31,6 @@ import stroom.query.api.v2.ResultRequest;
 import stroom.query.api.v2.SearchRequest;
 import stroom.query.api.v2.TableSettings;
 
-import javax.print.Doc;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

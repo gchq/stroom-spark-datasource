@@ -125,10 +125,10 @@ dependencies {
     implementation "${libs.spark_unsafe}"
 
     compile "${libs.slf4j_api}"
-    compile "${libs.jackson_annotations}"
-    compile "${libs.jackson_core}"
-    compile "${libs.jackson_databind}"
-    compile "${libs.javax_rs}"
+//    compile "${libs.jackson_annotations}"
+//    compile "${libs.jackson_core}"
+//    compile "${libs.jackson_databind}"
+//    compile "${libs.javax_rs}"
 //    compileOnly "${libs.swagger_annotations}"
 
     testCompileOnly "org.assertj:assertj-core:3.18.1"
@@ -168,12 +168,12 @@ tasks.register('fatJar', Jar) {
     subprojects.forEach {
         //Include all subprojects
         from it.configurations.archives.allArtifacts.files.collect {
-            print "Adding subproject jar $it.name\n"
+            print "Adding subproject jar $it.name to fat jar\n"
             zipTree(it)
         }
         //And also include their dependencies
         from it.configurations.runtimeClasspath.collect {
-            print "Adding subproject dep $it.name\n"
+            print "Adding subproject dependency $it.name to fat jar\n"
             zipTree(it)
         }
 
