@@ -62,7 +62,7 @@ ext.versions = [
         javax_rs: '2.0.1',
 
         slf4j : '1.7.25',
-        spark : '2.12:2.4.3',
+        spark : '2.12:2.4.8',
         swagger : '2.1.7',
 
         //--------Leave at end----------------------

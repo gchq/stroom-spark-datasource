@@ -8,8 +8,8 @@ This project provides an Apache Spark DataSource for Stroom.
 
 Using this library it is possible to search Stroom indexes from Apache Spark, both via the DSL and via Spark SQL.
 
-This DataSource is compatible with Apache Spark v2.4.3, but it might also work without modification on similar versions
-of Apache Spark.
+This DataSource is currently built for v2.4.8, and has been tested with v2.4.3, v2.4.7 and v2.4.8.
+It is also likely to be compatible with other versions of Apache Spark v2.4.x
 
 ## Building
 
