@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2021-05-24T14:59:53.556+01:00[Europe/London]")
 public class SearchableApi {
   private ApiClient apiClient;
 

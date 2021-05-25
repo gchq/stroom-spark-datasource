@@ -32,7 +32,6 @@ import org.openapitools.client.JSON;
 @JsonPropertyOrder({
   Welcome.JSON_PROPERTY_HTML
 })
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2021-05-24T14:59:53.556+01:00[Europe/London]")
 public class Welcome {
   public static final String JSON_PROPERTY_HTML = "html";
   private String html;

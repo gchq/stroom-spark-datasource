@@ -30,8 +30,24 @@ export OUTPUT_ROOT="${OUTPUT_DIR}/org/openapitools/client"
 export INPUT_ROOT="${CLIENT_DIR}/src/main/java/org/openapitools/client"
 
 mkdir -p ${OUTPUT_ROOT}
-cp ${INPUT_ROOT}/* ${OUTPUT_ROOT} 2> /dev/null
-cp -r "${INPUT_ROOT}/auth" ${OUTPUT_ROOT} 2> /dev/null
+for FILE in `find ${INPUT_ROOT} -maxdepth 1 -type f | grep -v 'CustomInstantDeserializer'`
+do
+  export BASENAME=`basename $FILE`
+  cat ${FILE} | grep -v "io.swagger.annotations" | grep -v "\@ApiModel" \
+  | sed 's/.withColonInTimeZone(true)//' \
+  | grep -v '\@javax.annotation.Generated' | grep -v 'LoggingFeature' | grep -v 'ThreeTenModule' \
+  | grep -v 'CustomInstantDeserializer' | grep -v 'ALLOW_COERCION_OF_SCALARS' | grep -v 'module' \
+   > "${OUTPUT_ROOT}/${BASENAME}"
+done
+
+mkdir -p ${OUTPUT_ROOT}/auth
+for FILE in `find ${INPUT_ROOT}/auth -maxdepth 1 -type f`
+do
+  export BASENAME=`basename $FILE`
+  cat ${FILE} | grep -v "io.swagger.annotations" | grep -v "\@ApiModel" \
+  | grep -v '\@javax.annotation.Generated' | grep -v 'LoggingFeature' > "${OUTPUT_ROOT}/auth/${BASENAME}"
+done
+
 mkdir -p ${OUTPUT_ROOT}/api
 
 #for FILE_CLASH in `find "${SOURCE_ROOT}/stroom/" -name \*.java | xargs -n 1 basename`
@@ -49,7 +65,8 @@ mkdir -p ${INPUT_MODEL_DIR}
 export SUPPORTED_MODEL_FILES="Welcome.java"
 for FILE in ${SUPPORTED_MODEL_FILES}
 do
-  cat ${INPUT_MODEL_DIR}/${FILE} | grep -v "io.swagger.annotations" | grep -v "\@ApiModel" > "${OUTPUT_MODEL_DIR}/${FILE}"
+  cat ${INPUT_MODEL_DIR}/${FILE} | grep -v "io.swagger.annotations" | grep -v "\@ApiModel" \
+  | grep -v '\@javax.annotation.Generated'> "${OUTPUT_MODEL_DIR}/${FILE}"
 done
 
 export INPUT_API_DIR="${INPUT_ROOT}/api"
@@ -58,8 +75,8 @@ export SUPPORTED_API_FILES="DataSourcesApi.java  SearchableApi.java  StroomIndex
 
 for FILE in ${SUPPORTED_API_FILES}
 do
-  cat ${INPUT_API_DIR}/$FILE |  grep -v 'import org.openapitools.client.model' | \
-  sed 's/package org.openapitools.client.api;/package org.openapitools.client.api;\n\nimport stroom.datasource.api.v2.*;\nimport stroom.docref.*;\nimport stroom.query.api.v2.*;\n\nimport org.openapitools.client.model.*;\n\n/' \
+  cat ${INPUT_API_DIR}/$FILE |  grep -v 'import org.openapitools.client.model' | grep -v '\@javax.annotation.Generated' \
+  | sed 's/package org.openapitools.client.api;/package org.openapitools.client.api;\n\nimport stroom.datasource.api.v2.*;\nimport stroom.docref.*;\nimport stroom.query.api.v2.*;\n\nimport org.openapitools.client.model.*;\n\n/' \
   > "${OUTPUT_ROOT}/api/${FILE}"
 done
 
