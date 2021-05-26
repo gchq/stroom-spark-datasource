@@ -18,14 +18,15 @@ buildscript {
         throw new GradleException("This build requires Java 8. Current SDK version is "+JavaVersion.current())
     repositories {
         jcenter()
-        maven { url "https://dl.bintray.com/stroom/stroom" }
+//        maven { url "https://dl.bintray.com/stroom/stroom" }
     }
     dependencies {
-        // A fork of https://github.com/wfhartford/gradle-dependency-analyze that works with Java 10
-        classpath 'stroom:gradle-dependency-analyze:v2.2.5'
-
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.8.4'
     }
+}
+
+plugins {
+    id "ca.cutterslade.analyze" version "1.6.0"
 }
 
 apply plugin: 'java-library'
@@ -33,7 +34,7 @@ apply plugin: 'idea'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
-apply plugin: 'ca.cutterslade.analyze'
+//apply plugin: 'ca.cutterslade.analyze'
 
 //if the project has a value for the passed property (i.e from the cmd line via -PpropName=xxx)
 //use that, else use a default value
@@ -51,20 +52,18 @@ ext.getPropertyOrDefault = { propName, defaultValue ->
 
 ext.versions = [
         //----------This project-----------------------
-        stroomSparkDatasource: getPropertyOrDefault('version', 'v1.0-alpha.4'),
-
-        //----------Stroom dependencies---------------
-        stroomExpression  : 'v3.0.0',
-        stroomQuery  : 'v4.0-beta.38',
+        stroomSparkDatasource: getPropertyOrDefault('version', 'v2.0-alpha.1'),
 
 
         //-------------3rd party libs-----------------
-        jackson           : '2.9.9',
+//        jackson           : '2.9.9',
 
+        jackson: '2.6.7',
         javax_rs: '2.0.1',
 
         slf4j : '1.7.25',
-        spark : '2.12:2.4.3',
+        spark : '2.12:2.4.8',
+        swagger : '2.1.7',
 
         //--------Leave at end----------------------
         zzDUMMYzz       : 'makes sorting this list easier'
@@ -72,10 +71,6 @@ ext.versions = [
 
 // dependency strings for use in sub projects
 ext.libs = [
-        //------Stroom-libs---------------
-        stroomExpression    : "stroom:stroom-expression:$versions.stroomExpression",
-        stroomQuery    : "stroom:stroom-query-api:$versions.stroomQuery",
-        stroomDocRef    : "stroom:stroom-docref:$versions.stroomQuery",
 
         //------------3rd-party------------
         assertj_core        : 'org.assertj:assertj-core:3.10.0',
@@ -98,6 +93,7 @@ ext.libs = [
         spark_sql               : "org.apache.spark:spark-sql_$versions.spark",
         spark_unsafe               : "org.apache.spark:spark-unsafe_$versions.spark",
         slf4j_api           : "org.slf4j:slf4j-api:$versions.slf4j",
+        swagger_annotations            : "io.swagger.core.v3:swagger-annotations:$versions.swagger",
 
         //--------Leave at end----------------------
         zzDUMMYzz           : "makes sorting easier"
@@ -113,17 +109,15 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenLocal()
+    maven { url "https://repo1.maven.org/maven2" }
     jcenter()
-    maven {
-        url "https://dl.bintray.com/stroom/stroom"
-    }
+//    maven {
+//        url "https://dl.bintray.com/stroom/stroom"
+//    }
 }
 
 dependencies {
-    compile "${libs.stroomDocRef}"
-    compile "${libs.stroomQuery}"
-//    compile "${libs.stroomExpression}"
-
+    compile project('client')
     // https://mvnrepository.com/artifact/org.apache.spark/spark-sql
     //compile group: 'org.apache.spark', name: 'spark-sql_2.12', version: "${versions.spark}"
     implementation "${libs.spark_catalyst}"
@@ -131,16 +125,22 @@ dependencies {
     implementation "${libs.spark_unsafe}"
 
     compile "${libs.slf4j_api}"
-    compile "${libs.jackson_annotations}"
-    compile "${libs.jackson_core}"
-    compile "${libs.jackson_databind}"
-    compile "${libs.javax_rs}"
+//    compile "${libs.jackson_annotations}"
+//    compile "${libs.jackson_core}"
+//    compile "${libs.jackson_databind}"
+//    compile "${libs.javax_rs}"
+//    compileOnly "${libs.swagger_annotations}"
 
-//    testCompileOnly "org.junit.jupiter:junit-jupiter-api:5.3.2"
-    testImplementation "org.assertj:assertj-core:3.10.0"
+    testCompileOnly "org.assertj:assertj-core:3.18.1"
+    testCompileOnly "org.junit.jupiter:junit-jupiter-api:5.3.2"
+    testImplementation "org.assertj:assertj-core:3.18.1"
 
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.3.2"
     testRuntimeOnly "org.slf4j:slf4j-nop:1.7.25"
+}
+
+test {
+    useJUnitPlatform()
 }
 
 def pomConfig = {
@@ -157,10 +157,27 @@ def pomConfig = {
 }
 
 //create a single Jar with all dependencies
-task fatJar(type: Jar) {
-    classifier = 'all'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
+tasks.register('fatJar', Jar) {
+    archiveClassifier = 'all'
+
+    from sourceSets.main.output
+
+    dependsOn configurations.runtimeClasspath
+
+
+    subprojects.forEach {
+        //Include all subprojects
+        from it.configurations.archives.allArtifacts.files.collect {
+            print "Adding subproject jar $it.name to fat jar\n"
+            zipTree(it)
+        }
+        //And also include their dependencies
+        from it.configurations.runtimeClasspath.collect {
+            print "Adding subproject dependency $it.name to fat jar\n"
+            zipTree(it)
+        }
+
+    }
 }
 
 task copyLibs(type: Copy) {
@@ -176,6 +193,26 @@ task sourcesJar(type: Jar, dependsOn: classes) {
 task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier = 'javadoc'
     from javadoc.destinationDir
+}
+
+tasks.register('uberJar', Jar) {
+    archiveClassifier = 'uber'
+
+    from sourceSets.main.output
+
+    dependsOn configurations.runtimeClasspath
+    from {
+
+
+        configurations.compileClasspath.findAll {
+            ["libToInclude.jar"].collect().contains(it.name)
+
+        }
+                .sort { it.name }.unique().collect {
+            print "Including $it.name\n"
+            zipTree(it)
+        }
+    }
 }
 
 artifacts {

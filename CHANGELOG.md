@@ -12,8 +12,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Removed
 
+## [v2.0-alpha.1] - 20121-05-26
+
+Replaced deprecated `stroom-query` client library with one based on stubs created using
+ `openapi-generator`  / `swagger-codegen`
+ 
+
 ## [v1.0-alpha.4] - 2019-10-30
 Equivalent of [v1.0-alpha.4_stroom-v6.x] but designed to be compatible with Stroom v7
+
 
 ## [v1.0-alpha.4_stroom-v6.x] - 2019-10-23
 

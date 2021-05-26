@@ -15,23 +15,18 @@
  */
 package stroom.spark.datasource;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.RamDiskReplicaLruTracker;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.unsafe.types.UTF8String;
+import org.openapitools.client.ApiException;
+import org.openapitools.client.api.StroomIndexQueriesApi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import stroom.query.api.v2.*;
+import stroom.query.api.v2.QueryKey;
+import stroom.query.api.v2.Row;
+import stroom.query.api.v2.SearchRequest;
+import stroom.query.api.v2.SearchResponse;
+import stroom.query.api.v2.TableResult;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -139,66 +134,13 @@ public class StroomSearcher {
         long maxIndex = searchRequest.getResultRequests().get(0).getRequestedRange().getOffset() +
                 searchRequest.getResultRequests().get(0).getRequestedRange().getLength() - 1;
 
-        Client client = ClientBuilder.newClient();
+        StroomIndexQueriesApi client = new StroomIndexQueriesApi();
 
-
-        String fullUrl = protocol + "://"+ host + "/" + url;
-
-        LOGGER.debug("Connecting to " + fullUrl);
-
-        final ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//        mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
-        mapper.configure(SerializationFeature.INDENT_OUTPUT, false);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-
-        String json = null;
-
+        SearchResponse searchResponse = null;
         try {
-            json = mapper.writeValueAsString(searchRequest);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new IllegalArgumentException("Unable to serialize the search request");
-        }
-
-        boolean searchProvided = (searchRequest.getQuery() == null);
-
-        traceRequest(json, searchProvided);
-
-        Response response = client.target(fullUrl)
-
-                .request()
-                .header("Authorization", "Bearer " + token)
-                .accept(MediaType.APPLICATION_JSON_TYPE)
-                .post(Entity.json(json));
-
-        if (response.getStatus() != 200) {
-            System.err.println("Output...");
-            System.err.println(response.readEntity(String.class));
-
-            try{
-                String responseBody = response.readEntity(String.class);
-                if (responseBody.length() > 0) {
-                    throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
-                            + response.getStatus() + " " + responseBody);
-                }
-            }catch (Exception ex) {
-                throw new IllegalArgumentException("Got non 200 response from Stroom search API: "
-                        + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
-            }
-        }
-
-        String responseBody = response.readEntity(String.class);
-        traceResponse(responseBody, searchProvided);
-
-        SearchResponse searchResponse;
-
-        try {
-            searchResponse = mapper.readValue(responseBody, SearchResponse.class);
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new IllegalArgumentException("Unable to read response");
-
+            searchResponse = client.searchStroomIndex(searchRequest);
+        } catch (ApiException ex) {
+            throw new RuntimeException("Search failed", ex);
         }
 
         TableResult tableResult = null;
@@ -215,7 +157,7 @@ public class StroomSearcher {
 
             tableResult = ((TableResult) searchResponse.getResults().get(0));
             result.rows = tableResult.getRows();
-            result.moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.complete();
+            result.moreExpected = tableResult.getTotalResults() < maxIndex && !searchResponse.getComplete();
         }
 
         firstRequest = false;
@@ -224,43 +166,15 @@ public class StroomSearcher {
     }
 
 
-    public void destroy(StroomQuery stroomQuery) throws IOException {
+    public boolean destroy(StroomQuery stroomQuery) throws IOException {
+        StroomIndexQueriesApi client = new StroomIndexQueriesApi();
 
-        Client client = ClientBuilder.newClient();
-
-
-        String fullUrl = protocol + "://"+ host + "/" + destroyURL;
-
-        if (true)
-            System.out.println("Connecting to " + fullUrl);
-
-
-        String json = "{ \"uuid\": \"" + stroomQuery.getQueryRequestKey() + "\" }";
-
-        if (true){
-            System.out.println ("Destruction request follows...");
-            System.out.println (json);
+        try {
+            return client.destroyStroomIndex(new QueryKey(stroomQuery.getQueryRequestKey()));
+        } catch (ApiException ex) {
+            LOGGER.warn("Unable to destroy search", ex);
+            return false;
         }
-
-        Response response = client.target(fullUrl)
-                .request()
-                .header("Authorization", "Bearer " + token)
-                .accept(MediaType.APPLICATION_JSON_TYPE)
-                .post(Entity.json(json));
-
-        if (response.getStatus() != 200) {
-            System.err.println("Output...");
-            System.err.println(response.readEntity(String.class));
-            throw new IllegalArgumentException("Got non 200 response from Stroom destroy API: "
-                    + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
-        }
-
-        String responseBody = response.readEntity(String.class);
-        if (responseBody.length() > 0) {
-            System.out.println ("Response follows...");
-            System.out.println (responseBody);
-        }
-
     }
 
     private static Object[] convertVals (List <String> original){

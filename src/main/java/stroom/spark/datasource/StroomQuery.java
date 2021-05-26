@@ -20,12 +20,28 @@ import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import stroom.query.api.v2.*;
+import stroom.docref.DocRef;
+import stroom.query.api.v2.ExpressionItem;
+import stroom.query.api.v2.ExpressionOperator;
+import stroom.query.api.v2.ExpressionTerm;
+import stroom.query.api.v2.Field;
+import stroom.query.api.v2.OffsetRange;
+import stroom.query.api.v2.Query;
+import stroom.query.api.v2.ResultRequest;
+import stroom.query.api.v2.SearchRequest;
+import stroom.query.api.v2.TableSettings;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 
-import static stroom.query.api.v2.ExpressionTerm.*;
-import static stroom.spark.datasource.StroomDataSource.*;
+import static stroom.spark.datasource.StroomDataSource.EXTRACTION_PIPELINE_DOCREF_TYPEID;
+import static stroom.spark.datasource.StroomDataSource.EXTRACTION_PIPELINE_NAME;
+import static stroom.spark.datasource.StroomDataSource.FIELD_CONTENT_METADATA_KEY;
+import static stroom.spark.datasource.StroomDataSource.INDEXED_FIELD_METADATA_KEY;
+import static stroom.spark.datasource.StroomDataSource.INDEX_DOCREF_TYPE_ID;
+import static stroom.spark.datasource.StroomDataSource.INDEX_NAME;
 
 
 public class StroomQuery {
@@ -85,12 +101,12 @@ public class StroomQuery {
         unpushedIndexedFilters = unsuccessfullyPushed;
 
 
-        ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.AND);
+        ExpressionOperator.Builder builder = ExpressionOperator.builder().op(ExpressionOperator.Op.AND);
 
 
         addExpressionTerm(builder, expression);
-        builder.addTerm(new ExpressionTerm.Builder().
-                field(eventTimeFieldName).condition(Condition.GREATER_THAN).value("2000-01-01T00:00:00.000Z").build());
+        builder.addTerm(ExpressionTerm.builder().
+                field(eventTimeFieldName).condition(ExpressionTerm.Condition.GREATER_THAN).value("2000-01-01T00:00:00.000Z").build());
 
         return builder.build();
     }
@@ -120,10 +136,10 @@ public class StroomQuery {
                 EqualTo filter = (EqualTo) filters[i];
 
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                    indexedFieldMap.get(filter.attribute()).getString(Condition.EQUALS.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                    indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.EQUALS.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.EQUALS).
+                            condition(ExpressionTerm.Condition.EQUALS).
                             value(filter.value().toString()).
                             build();
                     pushedFilters.add(filter);
@@ -136,10 +152,10 @@ public class StroomQuery {
                 IsNotNull filter = (IsNotNull) filters[i];
 
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.IS_NOT_NULL.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                        indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.IS_NOT_NULL.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.IS_NOT_NULL).
+                            condition(ExpressionTerm.Condition.IS_NOT_NULL).
 
                             build();
                     pushedFilters.add(filter);
@@ -151,10 +167,10 @@ public class StroomQuery {
             } else if (filters[i] instanceof GreaterThan){
                 GreaterThan filter = (GreaterThan) filters[i];
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.GREATER_THAN.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                        indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.GREATER_THAN.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.GREATER_THAN).
+                            condition(ExpressionTerm.Condition.GREATER_THAN).
                             value(filter.value().toString()).
                             build();
                     pushedFilters.add(filter);
@@ -167,10 +183,10 @@ public class StroomQuery {
                 GreaterThanOrEqual filter = (GreaterThanOrEqual) filters[i];
 
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.GREATER_THAN_OR_EQUAL_TO.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                        indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.GREATER_THAN_OR_EQUAL_TO.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.GREATER_THAN_OR_EQUAL_TO).
+                            condition(ExpressionTerm.Condition.GREATER_THAN_OR_EQUAL_TO).
                             value(filter.value().toString()).
                             build();
                     pushedFilters.add(filter);
@@ -183,10 +199,10 @@ public class StroomQuery {
 
                 LessThan filter = (LessThan) filters[i];
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.LESS_THAN.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                        indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.LESS_THAN.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.LESS_THAN).
+                            condition(ExpressionTerm.Condition.LESS_THAN).
                             value(filter.value().toString()).
                             build();
                     pushedFilters.add(filter);
@@ -199,10 +215,10 @@ public class StroomQuery {
 
                 LessThanOrEqual filter = (LessThanOrEqual) filters[i];
                 if (indexedFieldMap.containsKey(filter.attribute()) &&
-                        indexedFieldMap.get(filter.attribute()).getString(Condition.LESS_THAN_OR_EQUAL_TO.name()) != null){
-                    term = new ExpressionTerm.Builder().
+                        indexedFieldMap.get(filter.attribute()).getString(ExpressionTerm.Condition.LESS_THAN_OR_EQUAL_TO.name()) != null){
+                    term = ExpressionTerm.builder().
                             field(indexedFieldMap.get(filter.attribute()).getString(INDEXED_FIELD_METADATA_KEY)).
-                            condition(Condition.LESS_THAN_OR_EQUAL_TO).
+                            condition(ExpressionTerm.Condition.LESS_THAN_OR_EQUAL_TO).
                             value(filter.value().toString()).
                             build();
                     pushedFilters.add(filter);
@@ -220,7 +236,7 @@ public class StroomQuery {
                 ExpressionItem childItem = createExpression(new Filter[]{filter.child()}, successfullyPushed, unsuccessfullyPushed);
 
                 if (unsuccessfullyPushed.isEmpty()) {
-                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.NOT);
+                    ExpressionOperator.Builder builder = ExpressionOperator.builder().op(ExpressionOperator.Op.NOT);
 
                     addExpressionTerm(builder, childItem);
                     pushedFilters.add(filter);
@@ -247,7 +263,7 @@ public class StroomQuery {
                 ExpressionItem rightItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
 
                 if (unsuccessfullyPushed.isEmpty()) {
-                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
+                    ExpressionOperator.Builder builder = ExpressionOperator.builder().op(ExpressionOperator.Op.OR);
 
                     addExpressionTerm(builder, leftItem);
                     addExpressionTerm(builder, rightItem);
@@ -276,7 +292,7 @@ public class StroomQuery {
                 ExpressionItem rightItem = createExpression(new Filter[]{filter.left()}, successfullyPushed, unsuccessfullyPushed);
 
                 if (unsuccessfullyPushed.isEmpty()) {
-                    ExpressionOperator.Builder builder = new ExpressionOperator.Builder(ExpressionOperator.Op.OR);
+                    ExpressionOperator.Builder builder = ExpressionOperator.builder().op(ExpressionOperator.Op.OR);
 
                     addExpressionTerm(builder, leftItem);
                     addExpressionTerm(builder, rightItem);
@@ -318,16 +334,16 @@ public class StroomQuery {
         } else if (terms.size() > 1 && operators.size() == 0){
             //todo check that this is correct, should it actually be OR - the documentation for Spark interface spec
             // does not appear to define
-            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+            result = ExpressionOperator.builder().op(ExpressionOperator.Op.AND).
                     addTerms(terms).build();
 
         } else if (operators.size() > 1 && terms.size() == 0) {
-            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+            result = ExpressionOperator.builder().op(ExpressionOperator.Op.AND).
                     addOperators(operators).build();
         } else {
-            result = new ExpressionOperator.Builder(ExpressionOperator.Op.AND).
+            result = ExpressionOperator.builder().op(ExpressionOperator.Op.AND).
                     addOperators(operators).
-                    addOperator(new ExpressionOperator.Builder(ExpressionOperator.Op.AND).addTerms(terms).build()).build();
+                    addOperator(ExpressionOperator.builder().op(ExpressionOperator.Op.AND).addTerms(terms).build()).build();
         }
 
         return result;
@@ -350,7 +366,7 @@ public class StroomQuery {
     private void initTableSettings (boolean dummy){
 
 
-        TableSettings.Builder builder = new TableSettings.Builder()
+        TableSettings.Builder builder = TableSettings.builder()
                 .queryId("myQuery")
                 .extractionPipeline(EXTRACTION_PIPELINE_DOCREF_TYPEID,
                         extractionPipelineUUID,
@@ -361,7 +377,7 @@ public class StroomQuery {
         if (dummy){
             for (int i = 0; i < schema.fields().length; i++) {
                 builder.addFields(
-                        new Field.Builder()
+                        Field.builder()
                                 .name("F" + i)
                                 .expression("${" + DUMMY_FIELD_NAME + "}")
                                 .build());
@@ -376,14 +392,14 @@ public class StroomQuery {
 
                 if (field.metadata().contains(FIELD_CONTENT_METADATA_KEY)) {
                     builder.addFields(
-                            new Field.Builder()
+                            Field.builder()
                                     .name (DUMMY_FIELD_NAME)  //(field.name())
                                     .expression("${" + field.metadata().getString(FIELD_CONTENT_METADATA_KEY) + "}")
                                     .build());
                 } else if (field.metadata().contains(INDEXED_FIELD_METADATA_KEY)) {
                     fieldsAreIndex[i] = true;
                     builder.addFields(
-                            new Field.Builder()
+                            Field.builder()
                                     .name(DUMMY_FIELD_NAME)  //(field.name())
                                     .expression("${" + DUMMY_FIELD_NAME + "}")
                                     //.expression("${" + field.metadata().getString(INDEXED_FIELD_METADATA_KEY) + "}")
@@ -401,8 +417,8 @@ public class StroomQuery {
         ExpressionOperator expressionOperator = createOperator(initialFilters);
 
 
-        query = new Query.Builder()
-                .dataSource(INDEX_DOCREF_TYPE_ID, indexUUID, INDEX_NAME)
+        query = Query.builder()
+                .dataSource(new DocRef(INDEX_DOCREF_TYPE_ID, indexUUID, INDEX_NAME))
                 .expression(expressionOperator).build();
     }
 
@@ -412,12 +428,12 @@ public class StroomQuery {
 
     public SearchRequest createInitialSearchRequest() {
 
-        ResultRequest resultRequest = new ResultRequest.Builder().componentId("mainResult")
+        ResultRequest resultRequest = ResultRequest.builder().componentId("mainResult")
                 .resultStyle(ResultRequest.ResultStyle.TABLE)
-                .requestedRange(new OffsetRange.Builder().offset(0l).length(0l).build())
+                .requestedRange(OffsetRange.builder().offset(0l).length(0l).build())
                 .addMappings(tableSettings).build();
 
-        SearchRequest searchRequest = new SearchRequest.Builder()
+        SearchRequest searchRequest = SearchRequest.builder()
                 .query(query)
                 .key(queryRequestKey)
                 .incremental(true)
@@ -432,12 +448,12 @@ public class StroomQuery {
 
     public SearchRequest createSearchRequest(long startIndex, long numRecords) {
 
-        ResultRequest resultRequest = new ResultRequest.Builder().componentId("mainResult")
+        ResultRequest resultRequest = ResultRequest.builder().componentId("mainResult")
                 .resultStyle(ResultRequest.ResultStyle.TABLE)
-                .requestedRange(new OffsetRange.Builder().offset(startIndex).length(numRecords).build())
+                .requestedRange(OffsetRange.builder().offset(startIndex).length(numRecords).build())
                 .addMappings(tableSettings).build();
 
-        SearchRequest searchRequest = new SearchRequest.Builder()
+        SearchRequest searchRequest = SearchRequest.builder()
                 .key(queryRequestKey)
                 .incremental(true)
                 .dateTimeLocale("en-gb")

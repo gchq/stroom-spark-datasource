@@ -15,11 +15,11 @@
  */
 package stroom.spark.datasource;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import org.openapitools.client.ApiClient;
+import org.openapitools.client.ApiException;
+import org.openapitools.client.Configuration;
+import org.openapitools.client.api.DataSourcesApi;
+import org.openapitools.client.auth.ApiKeyAuth;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.sources.v2.reader.DataSourceReader;
@@ -29,15 +29,10 @@ import org.apache.spark.sql.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import stroom.datasource.api.v2.AbstractField;
-import stroom.datasource.api.v2.DataSource;
 import stroom.docref.DocRef;
 import stroom.query.api.v2.ExpressionTerm;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.IOException;
+
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -110,9 +105,7 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
             fieldList.add(new StructField("json", DataTypes.StringType, true,
                             new MetadataBuilder().putString(FIELD_CONTENT_METADATA_KEY,jsonFieldName).build()));
 
-            DataSource dataSource = interrogateDatasource();
-
-            for (AbstractField field : dataSource.getFields()){
+            for (AbstractField field : interrogateDatasource()){
                 if (field.getQueryable()) {
                     MetadataBuilder fieldMetadataBuilder = new MetadataBuilder().putString(INDEXED_FIELD_METADATA_KEY,
                             field.getName());
@@ -136,73 +129,30 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
         return schema;
     }
 
-    private DataSource interrogateDatasource (){
+    private List<AbstractField> interrogateDatasource (){
 
-        Client client = ClientBuilder.newClient();
+        ApiClient defaultClient = Configuration.getDefaultApiClient();
+        defaultClient.setBasePath(protocol + "://" + host + "/api");
+        defaultClient.setDebugging(true);
 
+        // Configure API key authorization: ApiKeyAuth
+        ApiKeyAuth ApiKeyAuth = (ApiKeyAuth) defaultClient.getAuthentication("ApiKeyAuth");
+        ApiKeyAuth.setApiKey(token);
+        // Uncomment the following line to set a prefix for the API key, e.g. "Token" (defaults to null)
+        //ApiKeyAuth.setApiKeyPrefix("Token");
 
-        String fullUrl = protocol + "://"+ host + "/" + datasourceUrl;
+        DataSourcesApi dataSourcesApi = new DataSourcesApi();
 
-        LOGGER.debug("Interrogate datasource - connecting to " + fullUrl);
-
-        final ObjectMapper mapper = new ObjectMapper();
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//        mapper.configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
-        mapper.configure(SerializationFeature.INDENT_OUTPUT, false);
-        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        // Enabling default typing adds type information where it would otherwise be ambiguous, i.e. for abstract classes
-//        mapper.enableDefaultTyping();
-        //   mapper.writeValue(outputStream, objectModel);
-
-        DocRef indexDocRef = new DocRef(INDEX_DOCREF_TYPE_ID, indexUUID, INDEX_NAME);
-
-        String json = null;
+        DocRef indexDocRef = new DocRef();
+        indexDocRef.setType(INDEX_DOCREF_TYPE_ID);
+        indexDocRef.setUuid(indexUUID);
+        indexDocRef.setName(INDEX_NAME);
 
         try {
-            json = mapper.writeValueAsString(indexDocRef);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            throw new IllegalArgumentException("Unable to serialize the dataSource request");
+            return dataSourcesApi.fetchDataSourceFields(indexDocRef);
+        } catch (ApiException e) {
+            throw new IllegalStateException("Unable to interrogate datasource via API", e);
         }
-
-        Response response = client.target(fullUrl)
-
-                .request()
-                .header("Authorization", "Bearer " + token)
-                .accept(MediaType.APPLICATION_JSON_TYPE)
-                .post(Entity.json(json));
-
-        if (response.getStatus() != 200) {
-            System.err.println("Output...");
-            System.err.println(response.readEntity(String.class));
-
-            try{
-                String responseBody = response.readEntity(String.class);
-                if (responseBody.length() > 0) {
-                    throw new IllegalArgumentException("Got non 200 response from Stroom dataSource API: "
-                            + response.getStatus() + " " + responseBody);
-                }
-            }catch (Exception ex) {
-                throw new IllegalArgumentException("Got non 200 response from Stroom dataSource API: "
-                        + response.getStatus() + " " + response.getStatusInfo().getReasonPhrase());
-            }
-        }
-
-        String responseBody = response.readEntity(String.class);
-
-        LOGGER.debug("Response received", responseBody);
-
-        DataSource dataSource;
-
-        try {
-            dataSource = mapper.readValue(responseBody, DataSource.class);
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new IllegalArgumentException("Unable to read dataSource response");
-
-        }
-
-        return dataSource;
     }
 
     public List<InputPartition<InternalRow>> planInputPartitions() {

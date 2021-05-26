@@ -3,6 +3,7 @@ target/
 .gradle/
 .ipynb_checkpoints/
 build/
+lib/
 *.log
 metastore_db/
 out/
