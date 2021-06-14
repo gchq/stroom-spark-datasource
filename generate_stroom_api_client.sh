@@ -23,7 +23,7 @@ export CLIENT_DIR="${TEMP}/stroom-api-client"
 
   #java -jar ${TEMP}/swagger-codegen-cli.jar generate -i $SWAGGER_URL -l java -o ${CLIENT_DIR} --additional-properties=library=jersey2
   #java -jar ${TEMP}/openapi-generator-cli.jar generate -i $SWAGGER_URL --minimal-update -g java -o ${CLIENT_DIR} --library=resttemplate --additional-properties=library=jersey2
-java -jar ${TEMP}/openapi-generator-cli.jar generate -i $SWAGGER_URL --minimal-update -g java -o ${CLIENT_DIR} --library=jersey2 --additional-properties=library=jersey2
+java -jar ${TEMP}/openapi-generator-cli.jar generate -i $SWAGGER_URL -g java -o ${CLIENT_DIR} --library=jersey2 --additional-properties=library=jersey2
 
 export SOURCE_ROOT="src/main/java"
 export OUTPUT_ROOT="${OUTPUT_DIR}/org/openapitools/client"

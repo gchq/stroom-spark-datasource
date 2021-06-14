@@ -28,14 +28,8 @@ Key facts:
 ## Getting Started
 
 The simple demonstrations of this capability that are contained within this repository all rely on there being
-a Stroom running on `localhost`, into which the standard Stroom content and sample data has been loaded by running the
-command `gradle setupSampleData` from the directory containing your git clone of the `stroom` git repository. 
-
-These demonstrations are designed to show the datasource operating in its simplest configuration, for clarity.
-For this reason, security has been disabled within Stroom, by setting the property `authenticationRequired : false` within
-`local.yml`.
-A real deployment would require a user account to be created within Stroom and for it to be assigned an authentication
-token, that is then passed in when instantiating the Datasource.
+a Stroom running on `localhost`.  Follow [these instructions](stroomInstallation.md) to install Stroom with the required configuration and
+data.
 
 Install Apache Spark on `localhost`.  Spark currently requires Java 8, therefore this must be available and `$JAVA_HOME`
 set to point at the Java 8 JDK.
@@ -59,11 +53,11 @@ basicSchema = StructType([StructField("streamId", StringType(), True, \
 
 basicDf = spark.read.format('stroom.spark.datasource.StroomDataSource').\
     load(token='eyJhbGciOiJSUzI1NiIsImtpZCI6IjhhM2I1OGNhLTk2ZTctNGFhNC05ZjA3LTQ0MDBhYWVkMTQ3MSJ9.eyJleHAiOjE2NDEzMTYyODMsInN1YiI6ImFkbWluIiwiaXNzIjoic3Ryb29tIiwiYXVkIjoiTlhDbXJyTGpQR2VBMVN4NWNEZkF6OUV2ODdXaTNucHRUbzZSdzVmTC5jbGllbnQtaWQuYXBwcy5zdHJvb20taWRwIn0.mU7gfhvbNFVzQ5RX86zcnvS6XZeNpYDZRJ5Zx2rPOuZsha15kJjMKw0PEH2T1Ucs2JEuhrj5P0Vu7pi_i7CtWSLNsmjZYrYL-udugijhEN9dxjuze5lnuOxb1LENrNoPaRvHpBiFyO3yIYO4Y9UcRdcAj-9Yt8zgqLP208KOU36n3dl0ErKXAKFyUbuu--1sDCnpSq4fxCMWfUhgENIkhUm6EnI8s510QdDxIeK95nHcM0H_I7cV0YXfpL4HgnsCCPJUJkYT1x71FQGuACi9Ba0JKdVF8PwdH4k4ryoK_b3ObFSueGpq2fBcFy385r6lDLUu91MODoY7yh9gagK-gw', \
-    timestampField='Event Time', \
-    host='localhost:8080', \
-    protocol='http',uri='api/stroom-index/v2', \
-    index='3e72379d-403f-4757-88d5-bfae4d724b55', \
-    pipeline='2ac7b541-293d-4d9e-bb8d-f081dd631c7c', \
+    timestampField='EventTime', \
+    host='localhost', \
+    protocol='http', \
+    index='57a35b9a-083c-4a93-a813-fc3ddfe1ff44', \
+    pipeline='13143179-b494-4146-ac4b-9a6010cada89', \
     schema=basicSchema)
 
 basicDf.groupBy(basicDf['streamId']).count().sort(['count'], ascending=False).show()
@@ -78,14 +72,15 @@ json_schema
 
 structuredDf = basicDf.withColumn('evt', from_json(col('json'), json_schema))
 
-wideDf=structuredDf.withColumn ('timestamp', col('evt.EventTime.TimeCreated')).\
+wideDf = structuredDf.withColumn('evt', from_json(col('json'), json_schema)).\
+    withColumn ('timestamp', col('evt.EventTime.TimeCreated')).\
     withColumn ('user', col('evt.EventSource.User.Id')).\
     withColumn('operation', col('evt.EventDetail.TypeId'))
 
 wideDf.show()
 
-wideDf.filter((wideDf['User'] == 'user1') | (wideDf['User'] == 'user2') | 
-    (wideDf['User'] == 'user3')).groupBy(wideDf['Operation']).count().show()
+wideDf.filter((wideDf['User'] == 'admin') | (wideDf['User'] == 'Internal Processing User'))\
+    .groupBy(wideDf['Operation']).count().show()
 ```
 
 If you are running a version of Stroom that supports `XPathOutputFilter`, XPaths can be used to access data directly.
@@ -107,8 +102,8 @@ df = spark.read.format('stroom.spark.datasource.StroomDataSource').\
     pipeline='26ed1000-255e-4182-b69b-00266be891ee', \
     schema=xpathSchema)
 
-df.filter((df['user'] == 'user1') | (df['user'] == 'user2') | (df['user'] == 'user3')).\
-    groupBy(df['operation']).count().show()
+df.filter((df['User'] == 'admin') | (df['User'] == 'Internal Processing User'))\
+      .groupBy(df['Operation']).count().show()
 
 ```
 

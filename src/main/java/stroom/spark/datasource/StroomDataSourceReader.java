@@ -105,7 +105,12 @@ public class StroomDataSourceReader implements DataSourceReader, SupportsPushDow
             fieldList.add(new StructField("json", DataTypes.StringType, true,
                             new MetadataBuilder().putString(FIELD_CONTENT_METADATA_KEY,jsonFieldName).build()));
 
-            for (AbstractField field : interrogateDatasource()){
+            final List<AbstractField> fields = interrogateDatasource();
+            if (fields == null) {
+                throw new IllegalArgumentException("Failed to read index structure");
+            }
+
+            for (AbstractField field : fields){
                 if (field.getQueryable()) {
                     MetadataBuilder fieldMetadataBuilder = new MetadataBuilder().putString(INDEXED_FIELD_METADATA_KEY,
                             field.getName());

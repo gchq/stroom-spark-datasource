@@ -41,7 +41,7 @@ import static stroom.spark.datasource.StroomDataSource.INDEX_NAME;
 
 public class TestSwaggerClient {
 
-    private static final String BASE_PATH="http://localhost/api";
+    private static final String BASE_PATH="https://127.0.0.1/api";
 
     //The Stroom Family Events Index from stroom-logs.zip standard content pack
     private static final String INDEX_UUID="3e72379d-403f-4757-88d5-bfae4d724b55";
@@ -55,6 +55,16 @@ public class TestSwaggerClient {
 
         // Configure API key authorization: ApiKeyAuth
         ApiKeyAuth ApiKeyAuth = (ApiKeyAuth) defaultClient.getAuthentication("ApiKeyAuth");
+//        ApiKeyAuth.setApiKey(
+//               "eyJhbGciOiJSUzI1NiIsImtpZCI6IjFlYzdhOTgzLTMxN2QtNDZjZS1hZTkzLWNlNDJiYzIxN2U1MiJ9." +
+//                       "eyJleHAiOjE2NTQzNDA4MzYsInN1YiI6ImFkbWluIiwiaXNzIjoic3Ryb29tIiwiYXVkIjoiZXhpVEZ3VWp" +
+//                       "BWXVybmxNVkV5VXJZNDdDUDJHeGdVZnhmZ1BkRUU2OC5jbGllbnQtaWQuYXBwcy5zdHJvb20taWRwIn0.OJpVk" +
+//                       "-xwdQuLIsJP5nRG6qY6oTGRaCXCb4cX_w0bASMNiBTQ_kgjOTpSmtHYsDAHzRzJE_N8Ef_svVPNj7UjTk5_sstd5bZZhXD" +
+//                       "B50wP71QUN-MEsX-LGlzJG-2e9CcNEoXTbD2kjuLMYMCg6r7_esC-iaVvHJBIhfJHOnh3zvgqTWfEM2B3Qwx1eXCwZ" +
+//                       "NzDHcMZvwR2Z-K3ny_Trm1HngJYCWI2DQ6HvukrVoRCm6vbNGyQ8WkRNoElJjOOZF3ErJAUJLqrnI2X" +
+//                       "PE444jamXlWJAJQhljm2rGsZEEhFXo8CMzV-70vBRPhxV7iSpwr2kboFgnpVePPXBCupdN8NjA"
+//        );
+
         ApiKeyAuth.setApiKey("eyJhbGciOiJSUzI1NiIsImtpZCI6IjhhM2I1OGNhLTk2ZTctNGFhNC05ZjA3" +
                 "LTQ0MDBhYWVkMTQ3MSJ9.eyJleHAiOjE2NDEzMTYyODMsInN1YiI6ImFkbWluIiwiaXNzIjoic3Ry" +
                 "b29tIiwiYXVkIjoiTlhDbXJyTGpQR2VBMVN4NWNEZkF6OUV2ODdXaTNucHRUbzZSdzVmTC5jbGllbnQta" +
@@ -115,8 +125,10 @@ public class TestSwaggerClient {
 
         List<AbstractField> fields = dataSourcesApi.fetchDataSourceFields(createIndexDocRef());
 
-        assertThat(fields).hasSize(21).withFailMessage("Unexpected number of columns. " +
-                "Have you imported stroom-logs-v3.0-beta.1.zip");
+        assertThat(fields).withFailMessage("Cannot find index " +
+                "Have you imported stroom-logs-v3.0-beta.1.zip").isNotNull();
+        assertThat(fields).withFailMessage("Unexpected number of columns (" + fields.size() + ")" +
+                "Have you imported stroom-logs-v3.0-beta.1.zip").hasSize(21);
     }
 
     private TableSettings createTableSettings() {
